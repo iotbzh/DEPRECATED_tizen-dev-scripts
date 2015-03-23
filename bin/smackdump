@@ -1,0 +1,20 @@
+#!/bin/sh
+
+dump() {
+	local root=$1
+	find -P "$root" -mount |
+	xargs chsmack |
+	sed -e 's/ access=/ -a /g' -e 's/ execute=/ -e /' -e 's/ mmap=/ -m /' -e 's/ transmute="TRUE"/ -t/' 
+}
+
+apply() {
+	cat "$@" |
+	sed 's/^\([^ ]*\) \(.*\)/\2 \1/' |
+	xargs -L 1 chsmack
+}
+
+case $(basename $0) in
+	smackdump) dump ${1:-/} > ${2:-/dev/stdout};;
+	smackapply) apply $1
+esac
+

@@ -1,0 +1,57 @@
+#!/bin/bash
+
+cd $(dirname $0)
+
+OUTDIR=out
+PATDIR=patterns
+
+SNAPSHOT=${1:-latest}
+URL=http://download.tizen.org/snapshots/tizen/common/$SNAPSHOT/repos/
+
+function get_deps() {
+	repo=$1
+	shift
+	arch=$1
+	shift
+	./solvdep -A $arch -r $URL/$repo/packages "$@" | sort 
+}
+
+function diff_only_source() {
+	diff --old-line-format='%L' --new-line-format='' --unchanged-line-format='' "$@"
+}
+function diff_only_dest() {
+	diff --old-line-format='' --new-line-format='%L' --unchanged-line-format='' "$@"
+}
+function diff_common() {
+	diff --old-line-format='' --new-line-format='' --unchanged-line-format='%L' "$@"
+}
+
+
+rm -rf $OUTDIR $PATDIR
+mkdir -p $OUTDIR $PATDIR
+
+pkgs="weston tizen-extensions-crosswalk"
+get_deps x86_64-wayland x86_64 $pkgs >$OUTDIR/arch_x86_64_w
+get_deps arm-wayland armv7l $pkgs >$OUTDIR/arch_arm_w
+pkgs="e17 tizen-extensions-crosswalk"
+get_deps x86_64-x11 x86_64 $pkgs >$OUTDIR/arch_x86_64_x
+get_deps arm-x11 armv7l $pkgs >$OUTDIR/arch_arm_x
+
+pkgs="weston tizen-extensions-crosswalk"
+get_deps x86_64-wayland x86_64 $pkgs >$OUTDIR/gfx_wayland
+
+pkgs="e17 tizen-extensions-crosswalk"
+get_deps x86_64-x11 x86_64 $pkgs >$OUTDIR/gfx_x11
+
+diff_only_source $OUTDIR/arch_x86_64_w $OUTDIR/arch_arm_w >$PATDIR/arch_intel_w
+diff_only_source $OUTDIR/arch_x86_64_x $OUTDIR/arch_arm_x >$PATDIR/arch_intel_x
+
+diff_only_dest $OUTDIR/arch_x86_64_w $OUTDIR/arch_arm_w >$PATDIR/arch_arm_w
+diff_only_dest $OUTDIR/arch_x86_64_x $OUTDIR/arch_arm_x >$PATDIR/arch_arm_x
+
+diff_common $OUTDIR/gfx_wayland $OUTDIR/gfx_x11 >$PATDIR/gfx_base
+diff_only_source $OUTDIR/gfx_wayland $OUTDIR/gfx_x11 >$PATDIR/gfx_wayland
+diff_only_dest $OUTDIR/gfx_wayland $OUTDIR/gfx_x11 >$PATDIR/gfx_x11
+
+
+exit 0

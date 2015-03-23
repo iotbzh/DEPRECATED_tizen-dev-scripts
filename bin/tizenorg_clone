@@ -1,0 +1,142 @@
+#!/bin/bash 
+
+PARALLEL_JOBS=8
+
+function error() { echo "Error: $@" >&2; exit 1; }
+
+host=review.tizen.org
+patterns="sdk/target tools/ scm/ platform/kernel platform/framework/ platform/core/ platform/upstream/ apps/ samples/native/ samples/web/ profile/ kernel test/generic"
+
+DIR=$(pwd -P)
+
+function color {
+	for k in $*; do
+		case $k in
+			bold) tput bold 2>/dev/null;;
+			none) tput sgr0 2>/dev/null;;
+			*) tput setaf $k 2>/dev/null;;
+		esac
+	done
+}
+
+RED=$(color bold 1)
+GREEN=$(color bold 2)
+YELLOW=$(color bold 3)
+COLOR_NONE=$(color none)
+
+function parallel_jobs {
+	local max_number=$((0 + ${1:-0}))
+	while true; do
+		jobs &>/dev/null
+		if [[ $(jobs -p | wc -l) -lt $max_number ]]; then
+			break
+		fi
+		sleep 0.3
+	done
+}
+
+function clone_project {
+	project=$1
+	cur=$2
+	total=$3
+
+	logfile=/tmp/tzclone/${BASHPID}.log
+	mkdir -p $(dirname $logfile)
+	exec 3>$logfile
+	echo "=============================== cloning $project ====================================" >&3
+
+	msg="[$cur/$total : $(( cur * 100 / total ))%] $project"
+
+	fetchopts="-p origin +refs/heads/*:refs/remotes/origin/* +refs/changes/*:refs/changes/*"
+
+	dir=$DIR/$project
+	if [[ -d $dir && -d $dir/.git ]]; then
+		msg="update $msg"
+		(cd $dir && git fetch $fetchopts) >&3 2>&3
+		rc=$?
+	else
+		msg="clone $msg"
+		rm -rf $dir
+		mkdir -p $(dirname $dir)
+		(git cclone $host:$project $dir) >&3 2>&3
+		rc=$?
+		(cd $dir && git fetch $fetchopts) >&3 2>&3
+	fi
+
+	if [[ $rc -ne 0 ]]; then
+		msg="$msg ${YELLOW}REINIT${COLOR_NONE}"
+		rm -rf $dir.old
+		[[ -d $dir ]] && mv $dir $dir.old
+		mkdir -p $(dirname $dir)
+		(git cclone $host:$project $dir && cd $dir && git fetch $fetchopts) >&3 2>&3
+		rc=$?
+		if [[ $rc -eq 0 ]]; then
+			rm -rf $dir.old
+		else
+			rm -rf $dir
+			[[ -d $dir.old ]] && mv $dir.old $dir
+		fi
+	fi
+
+	if [[ $rc -eq 0 ]]; then	
+		pushd $dir &>/dev/null
+
+		rc=1
+		for branch in tizen master tizen_2.2 tizen_2.1 tizen_2.0 HEAD upstream; do
+			git checkout -B $branch --force origin/$branch >&3 2>&3
+			if [[ $? -eq 0 ]]; then
+				rc=0
+				git clean -f -d
+				break
+			fi
+		done
+
+		if [[ $rc -eq 0 ]]; then
+			msg="$msg ${GREEN}OK${COLOR_NONE} : $(git branch | awk '{print $2}')"
+		else
+			msg="$msg ${YELLOW}CHECKOUT FAIL${COLOR_NONE}"
+			msg="$msg [$(git branch -a | awk '{print $1}' | grep ^remotes | sed 's|remotes/origin/||' | egrep -v "^(sandbox|accepted|HEAD)")]"
+		fi
+
+		popd &>/dev/null
+	else
+		msg="$msg ${RED}FAIL${COLOR_NONE}"
+	fi
+
+	if [[ $rc -eq 0 ]]; then
+		rm -f $logfile ${dir}.log
+	else
+		mv $logfile ${dir}.log
+		msg="$msg log: ${dir}.log"
+	fi		
+
+	echo $msg
+}
+
+# list projects
+truncate -s 0 projects.list
+echo "Retrieving projects list..."
+for x in $(ssh $host gerrit ls-projects 2>/dev/null | sort); do 
+	for p in $patterns; do 
+		if [[ "$x" =~ ^$p ]]; then
+			# match extra pattern from cmdline
+			[[ -n "$1" && ! ( $x =~ $1 ) ]] && continue 
+
+			echo $x >>projects.list
+		fi
+	done
+done
+
+cnt=$(wc -l projects.list)
+echo "$cnt projects to clone/update"
+
+i=0
+for x in $(cat projects.list); do
+	parallel_jobs $PARALLEL_JOBS
+	i=$(( i + 1 ))
+	clone_project $x $i $cnt &
+done
+
+parallel_jobs 1
+echo "Finished"
+

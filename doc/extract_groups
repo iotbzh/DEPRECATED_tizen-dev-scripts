@@ -1,0 +1,11 @@
+#!/bin/bash
+
+for x in ../git/meta/patterns/*.yaml; do
+
+echo "===" $(grep "Summary:" $x | sed 's/^Summary:[ ]*//') "==="
+
+grep "^-" $x | sed 's/^-/*/g' | sort
+
+echo
+
+done

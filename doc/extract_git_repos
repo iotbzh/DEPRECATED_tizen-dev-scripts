@@ -1,0 +1,36 @@
+#!/bin/bash
+
+cd $(dirname $0)
+
+DISTRO=${1:-common}
+DIRONLY=${2:-no}
+BASEURL=http://download.tizen.org/snapshots/tizen/$DISTRO/
+REPOS="${DISTRO}-wayland-ia32 ${DISTRO}-wayland-x86_64 ${DISTRO}-x11-ia32 ${DISTRO}-x11-x86_64"
+
+tmpfile=$(mktemp $(basename $0).XXXXXX)
+trap "rm -f $tmpfile" STOP INT QUIT EXIT
+
+{
+	for repo in $REPOS; do
+		SNAPSHOT_URL=$BASEURL/$repo/latest/
+
+		# fetch build.xml and get arch, repos ...
+		curl --silent $tmpfile ${SNAPSHOT_URL}/builddata/build.xml >$tmpfile
+
+		id=$(xml sel -t -v "/build/id/text()" <$tmpfile 2>/dev/null)
+		arch=$(xml sel -t -v "/build/archs/arch/text()" <$tmpfile 2>/dev/null)
+
+		echo "Detected: repo=$repo arch=$arch id=$id" >&2
+
+		manifest=${SNAPSHOT_URL}/builddata/manifest/${id}_${arch}.xml
+
+		curl --silent $manifest | xml sel -t -v "//manifest/project/@name"
+		echo
+	done
+} | sort -u | {
+	if [ "$DIRONLY" == "yes" ]; then
+		xargs -n 1 dirname | sort | uniq -c
+	else
+		cat
+	fi
+}

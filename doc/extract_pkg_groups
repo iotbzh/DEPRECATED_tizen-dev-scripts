@@ -1,0 +1,8 @@
+# work in source dir
+
+if [ ! -d $1 ]; then
+	echo "Usage: $0 <rpm source dir>"
+	exit 1
+fi
+
+rpm -qp --qf="%{Name} %{Group} %{License} %{VCS}\n" $1/*.rpm

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+echo "*               soft    core            unlimited" >>/etc/security/limits.conf
+echo "/tmp/core_%u.%p" >/proc/sys/kernel/core_pattern 
+
+
