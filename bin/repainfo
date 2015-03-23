@@ -1,0 +1,54 @@
+#!/bin/bash
+
+API=https://api.tizen.org
+GITDIR=~/devel/tizen3/git
+
+sub=$1
+[[ -z "$sub" ]] && { echo "Invalid submission." >&2; exit 1; }
+
+project=${2:-Tizen:Common}
+rungitg=$3
+
+subprj=home:prerelease:$project:$(echo $sub | tr '/' ':')
+
+subjson=$(osc -A $API meta prj $subprj | xml sel -t -v '/project/description' 2>/dev/null)
+
+pkgs=$(node << EOF
+var desc=$subjson;
+desc.projects.forEach(function(k) { process.stdout.write(k+'\n'); });
+EOF
+)
+
+for pkgpath in $pkgs; do 
+	pkg=$(basename $pkgpath)
+	meta=$(osc -A $API cat $subprj/$pkg/_service:gbs:_git-meta 2>/dev/null)
+	[ -z "$meta" ] && { echo "No meta for $pkgpath"; continue; }
+	eval $(
+node <<EOF
+	var meta=$meta;
+	var pkgpath="$pkgpath";
+	var pkg="$pkg";
+	function bashescape(s) { return s.replace(/['"]/g,"\\$&"); }
+	function dumpstring(name,value) { var s=name+"="+"'"+bashescape(value)+"'\\n"; process.stdout.write(s); process.stderr.write(s); }
+
+	dumpstring("PROJECT","$subprj");
+	dumpstring("PROJECT_URL","https://build.tizen.org/project/show?project="+encodeURIComponent("$subprj"));
+	dumpstring("PACKAGE_URL","https://build.tizen.org/package/show?project="+encodeURIComponent("$subprj")+"&package="+pkg);
+	dumpstring("TAGGER",meta.tag.tagger.name);
+	dumpstring("TAGGER_MAIL",meta.tag.tagger.email);
+	dumpstring("COMMENT",meta.tag.subject);
+	dumpstring("PACKAGE",pkgpath);
+	dumpstring("SHA1",meta.commit.sha1);
+	dumpstring("MANIFEST",'<project path="'+pkgpath+'" name="'+pkgpath+'" revision="'+meta.commit.sha1+'">');
+	dumpstring("GIT_URL","https://review.tizen.org/git/?p="+pkgpath+".git;a=commit;h="+meta.commit.sha1);
+EOF
+)
+
+	if [ "$rungitg" == "-v" -a -d $GITDIR/$pkgpath -a "$DISPLAY" == ":0.0" ]; then
+		echo "GIT_REPO=$GITDIR/$pkgpath"
+		pushd $GITDIR/$pkgpath >/dev/null
+		git fetchall >/dev/null 2>&1
+		/usr/bin/gitg -s $SHA1 2>/dev/null
+		popd >/dev/null
+	fi
+done

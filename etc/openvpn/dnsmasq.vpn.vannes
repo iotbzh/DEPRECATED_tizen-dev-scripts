@@ -1,0 +1,513 @@
+# generated zone file for dnsmasq
+# -------------------------------
+
+10.20.0.1	 server.vpn.vannes
+
+# client 1
+10.20.0.5	 srv-clt0001.vpn.vannes
+10.20.0.6	 clt0001.vpn.vannes
+
+# client 2
+# 10.20.0.9	 srv-clt0002.vpn.vannes
+# 10.20.0.10	 clt0002.vpn.vannes
+
+# client 3
+# 10.20.0.13	 srv-clt0003.vpn.vannes
+# 10.20.0.14	 clt0003.vpn.vannes
+
+# client 4
+# 10.20.0.17	 srv-clt0004.vpn.vannes
+# 10.20.0.18	 clt0004.vpn.vannes
+
+# client 5
+# 10.20.0.21	 srv-clt0005.vpn.vannes
+# 10.20.0.22	 clt0005.vpn.vannes
+
+# client 6
+# 10.20.0.25	 srv-clt0006.vpn.vannes
+# 10.20.0.26	 clt0006.vpn.vannes
+
+# client 7
+# 10.20.0.29	 srv-clt0007.vpn.vannes
+# 10.20.0.30	 clt0007.vpn.vannes
+
+# client 8
+# 10.20.0.33	 srv-clt0008.vpn.vannes
+# 10.20.0.34	 clt0008.vpn.vannes
+
+# client 9
+# 10.20.0.37	 srv-clt0009.vpn.vannes
+# 10.20.0.38	 clt0009.vpn.vannes
+
+# client 10
+# 10.20.0.41	 srv-clt0010.vpn.vannes
+# 10.20.0.42	 clt0010.vpn.vannes
+
+# client 11
+# 10.20.0.45	 srv-clt0011.vpn.vannes
+# 10.20.0.46	 clt0011.vpn.vannes
+
+# client 12
+# 10.20.0.49	 srv-clt0012.vpn.vannes
+# 10.20.0.50	 clt0012.vpn.vannes
+
+# client 13
+# 10.20.0.53	 srv-clt0013.vpn.vannes
+# 10.20.0.54	 clt0013.vpn.vannes
+
+# client 14
+# 10.20.0.57	 srv-clt0014.vpn.vannes
+# 10.20.0.58	 clt0014.vpn.vannes
+
+# client 15
+# 10.20.0.61	 srv-clt0015.vpn.vannes
+# 10.20.0.62	 clt0015.vpn.vannes
+
+# client 16
+# 10.20.0.65	 srv-clt0016.vpn.vannes
+# 10.20.0.66	 clt0016.vpn.vannes
+
+# client 17
+# 10.20.0.69	 srv-clt0017.vpn.vannes
+# 10.20.0.70	 clt0017.vpn.vannes
+
+# client 18
+# 10.20.0.73	 srv-clt0018.vpn.vannes
+# 10.20.0.74	 clt0018.vpn.vannes
+
+# client 19
+# 10.20.0.77	 srv-clt0019.vpn.vannes
+# 10.20.0.78	 clt0019.vpn.vannes
+
+# client 20
+# 10.20.0.81	 srv-clt0020.vpn.vannes
+# 10.20.0.82	 clt0020.vpn.vannes
+
+# client 21
+# 10.20.0.85	 srv-clt0021.vpn.vannes
+# 10.20.0.86	 clt0021.vpn.vannes
+
+# client 22
+# 10.20.0.89	 srv-clt0022.vpn.vannes
+# 10.20.0.90	 clt0022.vpn.vannes
+
+# client 23
+# 10.20.0.93	 srv-clt0023.vpn.vannes
+# 10.20.0.94	 clt0023.vpn.vannes
+
+# client 24
+# 10.20.0.97	 srv-clt0024.vpn.vannes
+# 10.20.0.98	 clt0024.vpn.vannes
+
+# client 25
+# 10.20.0.101	 srv-clt0025.vpn.vannes
+# 10.20.0.102	 clt0025.vpn.vannes
+
+# client 26
+# 10.20.0.105	 srv-clt0026.vpn.vannes
+# 10.20.0.106	 clt0026.vpn.vannes
+
+# client 27
+# 10.20.0.109	 srv-clt0027.vpn.vannes
+# 10.20.0.110	 clt0027.vpn.vannes
+
+# client 28
+# 10.20.0.113	 srv-clt0028.vpn.vannes
+# 10.20.0.114	 clt0028.vpn.vannes
+
+# client 29
+# 10.20.0.117	 srv-clt0029.vpn.vannes
+# 10.20.0.118	 clt0029.vpn.vannes
+
+# client 30
+# 10.20.0.121	 srv-clt0030.vpn.vannes
+# 10.20.0.122	 clt0030.vpn.vannes
+
+# client 31
+# 10.20.0.125	 srv-clt0031.vpn.vannes
+# 10.20.0.126	 clt0031.vpn.vannes
+
+# client 32
+# 10.20.0.129	 srv-clt0032.vpn.vannes
+# 10.20.0.130	 clt0032.vpn.vannes
+
+# client 33
+# 10.20.0.133	 srv-clt0033.vpn.vannes
+# 10.20.0.134	 clt0033.vpn.vannes
+
+# client 34
+# 10.20.0.137	 srv-clt0034.vpn.vannes
+# 10.20.0.138	 clt0034.vpn.vannes
+
+# client 35
+# 10.20.0.141	 srv-clt0035.vpn.vannes
+# 10.20.0.142	 clt0035.vpn.vannes
+
+# client 36
+# 10.20.0.145	 srv-clt0036.vpn.vannes
+# 10.20.0.146	 clt0036.vpn.vannes
+
+# client 37
+# 10.20.0.149	 srv-clt0037.vpn.vannes
+# 10.20.0.150	 clt0037.vpn.vannes
+
+# client 38
+# 10.20.0.153	 srv-clt0038.vpn.vannes
+# 10.20.0.154	 clt0038.vpn.vannes
+
+# client 39
+# 10.20.0.157	 srv-clt0039.vpn.vannes
+# 10.20.0.158	 clt0039.vpn.vannes
+
+# client 40
+# 10.20.0.161	 srv-clt0040.vpn.vannes
+# 10.20.0.162	 clt0040.vpn.vannes
+
+# client 41
+# 10.20.0.165	 srv-clt0041.vpn.vannes
+# 10.20.0.166	 clt0041.vpn.vannes
+
+# client 42
+# 10.20.0.169	 srv-clt0042.vpn.vannes
+# 10.20.0.170	 clt0042.vpn.vannes
+
+# client 43
+# 10.20.0.173	 srv-clt0043.vpn.vannes
+# 10.20.0.174	 clt0043.vpn.vannes
+
+# client 44
+# 10.20.0.177	 srv-clt0044.vpn.vannes
+# 10.20.0.178	 clt0044.vpn.vannes
+
+# client 45
+# 10.20.0.181	 srv-clt0045.vpn.vannes
+# 10.20.0.182	 clt0045.vpn.vannes
+
+# client 46
+# 10.20.0.185	 srv-clt0046.vpn.vannes
+# 10.20.0.186	 clt0046.vpn.vannes
+
+# client 47
+# 10.20.0.189	 srv-clt0047.vpn.vannes
+# 10.20.0.190	 clt0047.vpn.vannes
+
+# client 48
+# 10.20.0.193	 srv-clt0048.vpn.vannes
+# 10.20.0.194	 clt0048.vpn.vannes
+
+# client 49
+# 10.20.0.197	 srv-clt0049.vpn.vannes
+# 10.20.0.198	 clt0049.vpn.vannes
+
+# client 50
+# 10.20.0.201	 srv-clt0050.vpn.vannes
+# 10.20.0.202	 clt0050.vpn.vannes
+
+# client 51
+# 10.20.0.205	 srv-clt0051.vpn.vannes
+# 10.20.0.206	 clt0051.vpn.vannes
+
+# client 52
+# 10.20.0.209	 srv-clt0052.vpn.vannes
+# 10.20.0.210	 clt0052.vpn.vannes
+
+# client 53
+# 10.20.0.213	 srv-clt0053.vpn.vannes
+# 10.20.0.214	 clt0053.vpn.vannes
+
+# client 54
+# 10.20.0.217	 srv-clt0054.vpn.vannes
+# 10.20.0.218	 clt0054.vpn.vannes
+
+# client 55
+# 10.20.0.221	 srv-clt0055.vpn.vannes
+# 10.20.0.222	 clt0055.vpn.vannes
+
+# client 56
+# 10.20.0.225	 srv-clt0056.vpn.vannes
+# 10.20.0.226	 clt0056.vpn.vannes
+
+# client 57
+# 10.20.0.229	 srv-clt0057.vpn.vannes
+# 10.20.0.230	 clt0057.vpn.vannes
+
+# client 58
+# 10.20.0.233	 srv-clt0058.vpn.vannes
+# 10.20.0.234	 clt0058.vpn.vannes
+
+# client 59
+# 10.20.0.237	 srv-clt0059.vpn.vannes
+# 10.20.0.238	 clt0059.vpn.vannes
+
+# client 60
+# 10.20.0.241	 srv-clt0060.vpn.vannes
+# 10.20.0.242	 clt0060.vpn.vannes
+
+# client 61
+# 10.20.0.245	 srv-clt0061.vpn.vannes
+# 10.20.0.246	 clt0061.vpn.vannes
+
+# client 62
+# 10.20.0.249	 srv-clt0062.vpn.vannes
+# 10.20.0.250	 clt0062.vpn.vannes
+
+# client 63
+# 10.20.0.253	 srv-clt0063.vpn.vannes
+# 10.20.0.254	 clt0063.vpn.vannes
+
+# client 64
+# 10.20.1.1	 srv-clt0064.vpn.vannes
+# 10.20.1.2	 clt0064.vpn.vannes
+
+# client 65
+# 10.20.1.5	 srv-clt0065.vpn.vannes
+# 10.20.1.6	 clt0065.vpn.vannes
+
+# client 66
+# 10.20.1.9	 srv-clt0066.vpn.vannes
+# 10.20.1.10	 clt0066.vpn.vannes
+
+# client 67
+# 10.20.1.13	 srv-clt0067.vpn.vannes
+# 10.20.1.14	 clt0067.vpn.vannes
+
+# client 68
+# 10.20.1.17	 srv-clt0068.vpn.vannes
+# 10.20.1.18	 clt0068.vpn.vannes
+
+# client 69
+# 10.20.1.21	 srv-clt0069.vpn.vannes
+# 10.20.1.22	 clt0069.vpn.vannes
+
+# client 70
+# 10.20.1.25	 srv-clt0070.vpn.vannes
+# 10.20.1.26	 clt0070.vpn.vannes
+
+# client 71
+# 10.20.1.29	 srv-clt0071.vpn.vannes
+# 10.20.1.30	 clt0071.vpn.vannes
+
+# client 72
+# 10.20.1.33	 srv-clt0072.vpn.vannes
+# 10.20.1.34	 clt0072.vpn.vannes
+
+# client 73
+# 10.20.1.37	 srv-clt0073.vpn.vannes
+# 10.20.1.38	 clt0073.vpn.vannes
+
+# client 74
+# 10.20.1.41	 srv-clt0074.vpn.vannes
+# 10.20.1.42	 clt0074.vpn.vannes
+
+# client 75
+# 10.20.1.45	 srv-clt0075.vpn.vannes
+# 10.20.1.46	 clt0075.vpn.vannes
+
+# client 76
+# 10.20.1.49	 srv-clt0076.vpn.vannes
+# 10.20.1.50	 clt0076.vpn.vannes
+
+# client 77
+# 10.20.1.53	 srv-clt0077.vpn.vannes
+# 10.20.1.54	 clt0077.vpn.vannes
+
+# client 78
+# 10.20.1.57	 srv-clt0078.vpn.vannes
+# 10.20.1.58	 clt0078.vpn.vannes
+
+# client 79
+# 10.20.1.61	 srv-clt0079.vpn.vannes
+# 10.20.1.62	 clt0079.vpn.vannes
+
+# client 80
+# 10.20.1.65	 srv-clt0080.vpn.vannes
+# 10.20.1.66	 clt0080.vpn.vannes
+
+# client 81
+# 10.20.1.69	 srv-clt0081.vpn.vannes
+# 10.20.1.70	 clt0081.vpn.vannes
+
+# client 82
+# 10.20.1.73	 srv-clt0082.vpn.vannes
+# 10.20.1.74	 clt0082.vpn.vannes
+
+# client 83
+# 10.20.1.77	 srv-clt0083.vpn.vannes
+# 10.20.1.78	 clt0083.vpn.vannes
+
+# client 84
+# 10.20.1.81	 srv-clt0084.vpn.vannes
+# 10.20.1.82	 clt0084.vpn.vannes
+
+# client 85
+# 10.20.1.85	 srv-clt0085.vpn.vannes
+# 10.20.1.86	 clt0085.vpn.vannes
+
+# client 86
+# 10.20.1.89	 srv-clt0086.vpn.vannes
+# 10.20.1.90	 clt0086.vpn.vannes
+
+# client 87
+# 10.20.1.93	 srv-clt0087.vpn.vannes
+# 10.20.1.94	 clt0087.vpn.vannes
+
+# client 88
+# 10.20.1.97	 srv-clt0088.vpn.vannes
+# 10.20.1.98	 clt0088.vpn.vannes
+
+# client 89
+# 10.20.1.101	 srv-clt0089.vpn.vannes
+# 10.20.1.102	 clt0089.vpn.vannes
+
+# client 90
+# 10.20.1.105	 srv-clt0090.vpn.vannes
+# 10.20.1.106	 clt0090.vpn.vannes
+
+# client 91
+# 10.20.1.109	 srv-clt0091.vpn.vannes
+# 10.20.1.110	 clt0091.vpn.vannes
+
+# client 92
+# 10.20.1.113	 srv-clt0092.vpn.vannes
+# 10.20.1.114	 clt0092.vpn.vannes
+
+# client 93
+# 10.20.1.117	 srv-clt0093.vpn.vannes
+# 10.20.1.118	 clt0093.vpn.vannes
+
+# client 94
+# 10.20.1.121	 srv-clt0094.vpn.vannes
+# 10.20.1.122	 clt0094.vpn.vannes
+
+# client 95
+# 10.20.1.125	 srv-clt0095.vpn.vannes
+# 10.20.1.126	 clt0095.vpn.vannes
+
+# client 96
+# 10.20.1.129	 srv-clt0096.vpn.vannes
+# 10.20.1.130	 clt0096.vpn.vannes
+
+# client 97
+# 10.20.1.133	 srv-clt0097.vpn.vannes
+# 10.20.1.134	 clt0097.vpn.vannes
+
+# client 98
+# 10.20.1.137	 srv-clt0098.vpn.vannes
+# 10.20.1.138	 clt0098.vpn.vannes
+
+# client 99
+# 10.20.1.141	 srv-clt0099.vpn.vannes
+# 10.20.1.142	 clt0099.vpn.vannes
+
+# client 100
+# 10.20.1.145	 srv-clt0100.vpn.vannes
+# 10.20.1.146	 clt0100.vpn.vannes
+
+# client 101
+# 10.20.1.149	 srv-clt0101.vpn.vannes
+# 10.20.1.150	 clt0101.vpn.vannes
+
+# client 102
+# 10.20.1.153	 srv-clt0102.vpn.vannes
+# 10.20.1.154	 clt0102.vpn.vannes
+
+# client 103
+# 10.20.1.157	 srv-clt0103.vpn.vannes
+# 10.20.1.158	 clt0103.vpn.vannes
+
+# client 104
+# 10.20.1.161	 srv-clt0104.vpn.vannes
+# 10.20.1.162	 clt0104.vpn.vannes
+
+# client 105
+# 10.20.1.165	 srv-clt0105.vpn.vannes
+# 10.20.1.166	 clt0105.vpn.vannes
+
+# client 106
+# 10.20.1.169	 srv-clt0106.vpn.vannes
+# 10.20.1.170	 clt0106.vpn.vannes
+
+# client 107
+# 10.20.1.173	 srv-clt0107.vpn.vannes
+# 10.20.1.174	 clt0107.vpn.vannes
+
+# client 108
+# 10.20.1.177	 srv-clt0108.vpn.vannes
+# 10.20.1.178	 clt0108.vpn.vannes
+
+# client 109
+# 10.20.1.181	 srv-clt0109.vpn.vannes
+# 10.20.1.182	 clt0109.vpn.vannes
+
+# client 110
+# 10.20.1.185	 srv-clt0110.vpn.vannes
+# 10.20.1.186	 clt0110.vpn.vannes
+
+# client 111
+# 10.20.1.189	 srv-clt0111.vpn.vannes
+# 10.20.1.190	 clt0111.vpn.vannes
+
+# client 112
+# 10.20.1.193	 srv-clt0112.vpn.vannes
+# 10.20.1.194	 clt0112.vpn.vannes
+
+# client 113
+# 10.20.1.197	 srv-clt0113.vpn.vannes
+# 10.20.1.198	 clt0113.vpn.vannes
+
+# client 114
+# 10.20.1.201	 srv-clt0114.vpn.vannes
+# 10.20.1.202	 clt0114.vpn.vannes
+
+# client 115
+# 10.20.1.205	 srv-clt0115.vpn.vannes
+# 10.20.1.206	 clt0115.vpn.vannes
+
+# client 116
+# 10.20.1.209	 srv-clt0116.vpn.vannes
+# 10.20.1.210	 clt0116.vpn.vannes
+
+# client 117
+# 10.20.1.213	 srv-clt0117.vpn.vannes
+# 10.20.1.214	 clt0117.vpn.vannes
+
+# client 118
+# 10.20.1.217	 srv-clt0118.vpn.vannes
+# 10.20.1.218	 clt0118.vpn.vannes
+
+# client 119
+# 10.20.1.221	 srv-clt0119.vpn.vannes
+# 10.20.1.222	 clt0119.vpn.vannes
+
+# client 120
+# 10.20.1.225	 srv-clt0120.vpn.vannes
+# 10.20.1.226	 clt0120.vpn.vannes
+
+# client 121
+# 10.20.1.229	 srv-clt0121.vpn.vannes
+# 10.20.1.230	 clt0121.vpn.vannes
+
+# client 122
+# 10.20.1.233	 srv-clt0122.vpn.vannes
+# 10.20.1.234	 clt0122.vpn.vannes
+
+# client 123
+# 10.20.1.237	 srv-clt0123.vpn.vannes
+# 10.20.1.238	 clt0123.vpn.vannes
+
+# client 124
+# 10.20.1.241	 srv-clt0124.vpn.vannes
+# 10.20.1.242	 clt0124.vpn.vannes
+
+# client 125
+# 10.20.1.245	 srv-clt0125.vpn.vannes
+# 10.20.1.246	 clt0125.vpn.vannes
+
+# client 126
+# 10.20.1.249	 srv-clt0126.vpn.vannes
+# 10.20.1.250	 clt0126.vpn.vannes
+
+# client 127
+# 10.20.1.253	 srv-clt0127.vpn.vannes
+# 10.20.1.254	 clt0127.vpn.vannes
+

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+ispkg=1
+
+pkg=
+rev=
+
+xml sel -t -v "/manifest/project/@name|/manifest/project/@revision" "$@" | while read elm; do 
+	[[ $ispkg == 1 ]] && { pkg=$elm; ispkg=0; continue; }
+	rev=$elm
+	ispkg=1
+
+	echo "$pkg;$rev"
+done

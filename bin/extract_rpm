@@ -1,0 +1,15 @@
+#!/bin/bash
+
+pkg=$1
+
+if [ ! -f $pkg ]; then
+	echo "Usage: $0 <rpm file>" >&2
+	exit 1
+fi
+
+SUBDIR=$(basename $pkg .rpm)
+
+mkdir -p $SUBDIR
+echo "Extracting in $SUBDIR"
+rpm2cpio $pkg | ( cd $SUBDIR; cpio -idmv )
+

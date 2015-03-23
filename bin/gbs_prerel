@@ -1,0 +1,1 @@
+ gbs build -A i586 -R http://download.tizen.org/live/home:/prerelease:/Tizen:/IVI:/submit:/tizen_ivi:/20140626.144348/atom/ --skip-conf-repos -D b2d71c2a2940188998b5e7fa65c0b05c-build.conf

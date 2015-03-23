@@ -1,0 +1,49 @@
+#!/bin/sh
+
+pkglist=$1
+target=${2:-tizen_common}
+
+[ ! -f "$pkglist" ] && { echo "Usage: $(basename $0) <package list> [target]"; exit 1; }
+
+comments="re-submission for $(basename $pkglist .lst)"
+
+gitdir=~/devel/tizen3/git
+
+set -e
+
+echo "Target   : $target"
+echo "Comments : $comments"
+
+cat $pkglist | while IFS=":; " read path commitid; do
+	localgit=$gitdir/$path
+
+	[ -z "$path" ] && continue
+	[ -z "$commitid" ] && { echo "Invalid commit ID for $path"; continue; }
+
+	if [ -d $localgit ]; then
+		echo "----------------- Fetching $localgit --------------------"
+		pushd $localgit
+		git fetch -p
+		popd
+	else
+		echo "----------------- Cloning $path --------------------"
+		mkdir -p $(dirname $localgit)
+		git cclone review.tizen.org:$path $localgit 2>/dev/null
+	fi
+	pushd $localgit 
+	git checkout tizen 
+	git reset --hard origin/tizen
+	git branch -D groupsub || true
+	git checkout -b groupsub $commitid
+	popd
+done
+
+cat $pkglist | while IFS=":; " read path commitid; do
+	pushd $gitdir/$path
+	gbs submit -t $target -m "$comments"
+	git checkout tizen 
+	git branch -D groupsub || true
+	popd
+done
+
+echo "Done"

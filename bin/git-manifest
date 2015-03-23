@@ -1,0 +1,15 @@
+#!/bin/bash
+
+TZHOST=review.tizen.org
+
+function error() { echo "Error: $@" >&2; exit 1; }
+function info() { echo "$@" >&2; }
+
+projectpath=$(git remote -v | grep $TZHOST | grep "(push)" | awk '{print $2}' | sed "s/$TZHOST://")
+[ -z "$projectpath" ] && return 1
+sha1=$(git log -1 --pretty=format:%H)
+#sha1=$(git rev-parse HEAD)
+
+echo "   <!-- $(whoami) { -->"
+echo "   <project name=\"$projectpath\" revision=\"$sha1\"/>"
+echo "   <!-- } -->"

@@ -1,0 +1,108 @@
+#!/bin/bash
+
+TMPFILE=$(mktemp repa.XXXXXXXX)
+LSTFILE=$(mktemp repalst.XXXXXXXX)
+trap "rm -f $TMPFILE $LSTFILE" STOP INT QUIT EXIT
+
+repa list >$LSTFILE
+exec 3<$LSTFILE
+while read -u 3 -a fields; do
+	nf=${#fields[*]}
+	sub=${fields[0]}
+	pkg=${fields[$(( nf - 1 ))]}
+	unset fields[0]
+	unset fields[$(( nf - 1 ))]
+	info="${fields[*]}"
+
+	while [ 1 ]; do
+		echo "$sub : $pkg : $info"
+		read -p "===> D(etails), A(ccept), R(eject), G(roup), S(kip) or e(X)it ? " cmd
+		case $cmd in
+			d|D)
+				repa info $sub
+				;;
+			a|A)
+				echo "Accepting $sub"
+				echo "A $sub $pkg" >>$TMPFILE
+				break;
+				;;
+			r|R)
+				IFS='' read -p "Enter comment: " comment
+				echo "Reject $sub"
+				comment=$(sed 's/"/\\"/g' <<<$comment)
+				echo "R $sub $pkg \"$comment\"" >>$TMPFILE
+				break;
+				;;
+			g|G)
+				echo "Grouping $sub"
+				echo "G $sub $pkg" >>$TMPFILE
+				break;
+				;;
+			x|X)
+				exit 1;
+				;;
+			s|S)
+				echo "Skipping $sub"
+				break;
+				;;
+			*)
+				# ask again
+				;;
+		esac
+	done
+done
+
+# remove duplicates if any
+{ rm $TMPFILE && sort -u >$TMPFILE; } <$TMPFILE
+
+function prompt_continue() {
+	while [ 1 ]; do
+		read -p "==> Continue: Y/N ? " cmd
+		[[ -z "$cmd" ]] && continue
+		if [[ $cmd =~ ^(Y|y)$ ]]; then
+			return 0
+		fi
+		return 1
+	done
+}
+
+# handle accepted requests
+sublist=$(grep ^A $TMPFILE | awk '{printf("%s ",$2);}')
+if [[ -n "$sublist" ]]; then
+	echo "The following submissions are ready for accept:"
+	grep ^A $TMPFILE
+	if prompt_continue; then 
+		echo "Accepting submissions..."
+		for sub in $sublist; do
+			repa accept $sub
+		done
+	fi
+fi
+
+# handle rejected requests
+sublist=$(grep ^R $TMPFILE | awk '{printf("%s ",$2);}')
+if [[ -n "$sublist" ]]; then
+	echo "The following submissions are ready for reject:"
+	grep ^R $TMPFILE
+	if prompt_continue; then 
+		echo "Rejecting submissions..."
+		for sub in $sublist; do
+			comment=$(grep ^R $TMPFILE | cut -f4- -d' ')
+			repa reject -c "$comment" $sub
+		done
+	fi
+fi
+
+# handle grouping of requests
+sublist=$(grep ^G $TMPFILE | awk '{printf("%s ",$2);}')
+if [[ -n "$sublist" ]]; then
+	echo "The following submissions are ready for grouping:"
+	grep ^G $TMPFILE
+	if prompt_continue; then 
+		echo "Grouping submissions..."
+		repa group $sublist
+	fi
+fi
+
+
+

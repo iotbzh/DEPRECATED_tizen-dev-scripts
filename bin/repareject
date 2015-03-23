@@ -1,0 +1,79 @@
+#!/bin/bash
+
+sub=$1
+shift
+
+[ -z "$sub" ] && { echo "Usage: $0 <submission>"; exit 1; }
+
+tmpcomment=$(mktemp)
+trap "rm -f ${tmpcomment}*" STOP INT QUIT EXIT
+
+echo >$tmpcomment
+echo "-----------------------------------------------------" >>$tmpcomment
+if [ $# -gt 0 ]; then
+	for x in "$@"; do 
+		echo $x >>$tmpcomment
+	done
+fi
+
+cnt=$(wc -l $tmpcomment | awk '{print $1}')
+
+
+
+cat <<EOF >>$tmpcomment
+
+---
+$(git config --get user.name) - $(git config --get user.title || echo "Release Engineer")
+<$(git config --get user.email)>
+-----------------------------------------------------
+TEMPLATES: (REMOVED FROM MESSAGE)
+=================================
+
+Please fix the build error and try to rebuild the package locally (and major dependent packages too, if they're known):
+- use 'gbs build' with a configuration pointing to the repository where the error was found.
+- when everything builds fine locally, send you patch for review (gerrit)
+- after the patch has been merged, re-submit to OBS to trigger a new prerelease build
+- follow your submission on http://panel.tizen.org
+
+MULTIPLE SUBMISSIONS FOR THE SAME PACKAGE WITH THE SAME REVISION SHOULD BE AVOIDED:
+1 - it's useless
+2 - it's counter-productive as it load the build system for nothing
+3 - it's a waste of time for Release Engineers
+Except when explicitely asked to do so, please avoid to submit multiple times for build.
+
+MULTIPLE DEPENDENT PACKAGES SHOULD BE SUBMITTED IN A GROUP SUBMISSION, not in multiple single submissions.
+Please read the following documentation: https://source.tizen.org/documentation/developer-guide/getting-started-guide/contributing-code-tizen , chapter 3.1.2.
+
+YOUR SUBMISSION COMMENT DOESN'T HELP. Please, take time to write a message that will help the release engineers to better understand why you submitted. It can be as simple as "Bug Fix TC-xxxx" or "Bump to version x.y.z". But messages like "Updated" are useless.
+
+WARNING: YOU SUBMITTED AN OLDER REVISION OF THE PACKAGE. This is probably an error, as the submitted revision is already in the current project. Please update your git tree and re-check. If this second check hadn't been done, we would have gone backward for the package, potentially reintroducing bugs that were fixed by the latest revisions. 
+
+PLEASE BE CAREFUL WHEN SUBMITTING:
+- always get the latest updates on your local git tree (git fetch, git pull)
+- double check that you're on the correct revision to be submitted (git log)
+- check that it hadn't been submitted previously (https://panel.tizen.org or git tag)
+
+
+EOF
+echo >>$tmpcomment
+
+cp $tmpcomment ${tmpcomment}.old
+vi +$((cnt+1)) $tmpcomment || { echo "Aborted." ; exit 1; }
+
+diff -wqB  $tmpcomment ${tmpcomment}.old && { echo "Message not updated."; exit 1; }
+
+sed -n -i '/^TEMPLATES:/q;p' $tmpcomment
+
+cat $tmpcomment
+echo -n "Send reject ? (Y/N): "
+read ans
+
+case $ans in
+	y|Y|yes|YES)
+		echo ">>>>>>>>>>>>"
+		repa reject $sub -c "$(cat $tmpcomment)"
+		;;
+	*)
+		echo "Aborted"
+		;;
+esac

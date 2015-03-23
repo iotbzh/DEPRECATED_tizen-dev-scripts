@@ -1,0 +1,26 @@
+#!/bin/bash
+
+TZHOST="review.tizen.org"
+
+function error() { echo "Error: $@" >&2; exit 1; }
+function info() { echo "$@" >&2; }
+
+projectpath=$(git remote -v | grep "(push)" | awk '{print $2}')
+if [[ $projectpath =~ $TZHOST ]]; then
+	projectpath=ssh://$TZHOST:29418/$(echo $projectpath | sed "s/$TZHOST://")
+fi
+[[ -z "$projectpath" ]] && exit 1
+
+sha1=$(git log -1 --pretty=format:%H)
+#sha1=$(git rev-parse HEAD)
+
+cat <<EOF
+<services>
+   <service name='gbs'>
+      <param name='revision'>$sha1</param>
+	  <param name='url'>$projectpath</param>
+	  <param name='git-meta'>_git-meta</param>
+   </service>
+</services>
+EOF
+

@@ -1,0 +1,113 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+use Net::Netmask;
+use POSIX;
+
+my $outfile=$ARGV[0] || "dnsmasq.vpn.vannes";
+my $network=$ARGV[1] || "10.20.0.0/23";
+my $domain=$ARGV[2] || "vpn.vannes";
+
+my $blk=new Net::Netmask($network) || die "Usage: $0 <zone file> [network/netmask]";
+
+my @nets=$blk->enumerate(30);
+
+my @addr;
+
+my $srvnet=new Net::Netmask(shift(@nets)."/30");
+push @addr,["server.$domain",$srvnet->nth(1)];
+push @addr,"";
+
+my $decid=1;
+my $maxdec=scalar(@nets);
+
+print "maxdec=$maxdec\n";
+my $nbdigit=ceil(log10($maxdec));
+print "nbdigit=$nbdigit\n";
+
+$nbdigit=4 if ($nbdigit<4);
+my $fmt="%0".$nbdigit."d";
+print "fmt=$fmt\n";
+
+foreach my $vpnbase (@nets) {
+	my $vpn=new Net::Netmask("$vpnbase/30");
+	my $ip=$vpn->nth(2);
+	my $name;
+
+	if ($decid<=$maxdec) {
+		push @addr,"# client $decid";
+		$name=sprintf("clt$fmt",$decid++);
+	}
+	else {
+		# increment before use to avoid genid=0
+		$decid++;
+		push @addr,"# generic client ".($decid-$maxdec);
+		$name=sprintf("gen$fmt",$decid-$maxdec);
+	}
+
+	push @addr,["srv-$name.$domain",$vpn->nth(1)]; # server endpoint 
+	push @addr,["$name.$domain",$ip]; # client endpoint
+	push @addr,"";
+}
+
+open Z,">$outfile.gen" || die "Unable to open $outfile.gen";
+
+print Z <<EOF;
+# generated zone file for dnsmasq
+# -------------------------------
+
+EOF
+
+foreach my $dec (@addr) {
+	if (ref($dec) eq "ARRAY") {
+		my $name=$dec->[0];
+		my $ip=$dec->[1];
+		my ($a,$b,$c,$d)=split(/\./,$ip);
+		my $revip;
+		if ($blk->bits()>=24) {
+			$revip="$d";
+		}
+		elsif ($blk->bits()>=16) {
+			$revip="$d.$c";
+		}
+		elsif ($blk->bits()>=8) {
+			$revip="$d.$c.$b";
+		}
+		else {
+			$revip="$d.$c.$b.$a";
+		}
+		
+		print Z "# $ip\t $name\n";
+		print join(" => ",@$dec)."\n";
+	}
+	else {
+		print Z "$dec\n";
+		print "$dec\n";
+	}
+}
+
+close(Z);
+
+my ($a,$b,$c,$d)=split(/\./,$blk->base());
+my $revip;
+if ($blk->bits()>=24) {
+	$revip="$c.$b.$a";
+}
+elsif ($blk->bits()>=16) {
+	$revip="$b.$a";
+}
+elsif ($blk->bits()>=8) {
+	$revip="$a";
+}
+else {
+	$revip="$a";
+}
+
+
+print <<EOF;
+Add the following line to /etc/dnsmasq.conf:
+
+addn-hosts="/etc/openvpn/dnsmasq.$domain.hosts";
+EOF
+

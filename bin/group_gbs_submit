@@ -1,0 +1,66 @@
+#!/bin/sh
+
+pkglist=$1
+target=${2:-tizen_common}
+tag=${3:-submit/$target/$(date -u +%Y%m%d.%H%M%S)}
+
+[ ! -f "$pkglist" ] && { echo "Usage: $(basename $0) <package list> [target [tag]]"; exit 1; }
+
+comments="grouped submission for $(basename $pkglist .lst)"
+
+gitdir=~/devel/tizen3/git
+
+set -e
+
+echo "Target   : $target"
+echo "TAG      : $tag"
+echo "Comments : $comments"
+
+function strip_pkglist() {
+	# remove commented lines and empty lines
+	sed -r -e 's/#.*$//g' -e 's/^\s+//g' $1 | grep -v "^$"
+}
+	
+strip_pkglist $pkglist | while IFS=":; " read path commitid; do
+	localgit=$gitdir/$path
+
+	[ -z "$path" ] && continue
+	[ -z "$commitid" ] && { echo "Invalid commit ID for $path"; continue; }
+
+	if [ -d $localgit ]; then
+		echo "----------------- Fetching $localgit --------------------"
+		pushd $localgit
+		git fetch -p 2>/dev/null
+		popd
+	else
+		echo "----------------- Cloning $path --------------------"
+		mkdir -p $(dirname $localgit)
+		git cclone review.tizen.org:$path $localgit 2>/dev/null
+	fi
+	pushd $localgit 
+	git checkout -f tizen 
+	git reset --hard origin/tizen
+	brhead=(git rev-parse HEAD)
+	accepted=(git rev-parse origin/accepted/$target)
+	git branch -D groupsub || true
+	git checkout -f -b groupsub $commitid
+
+	git merge-base --is-ancestor $commitid $accepted && [[ $commitid != $accepted ]] && echo "WARNING: $path $commitid (submitted) is older than $accepted (accepted/$target)"
+	git merge-base --is-ancestor $commitid $brhead || echo "WARNING: $path $commitid was not merged in branch $target"
+	popd
+done
+
+strip_pkglist $pkglist | while IFS=":; " read path commitid; do
+	[ -z "$path" ] && continue
+	[ -z "$commitid" ] && { echo "Invalid commit ID for $path"; continue; }
+
+	pushd $gitdir/$path
+	gbs submit --tag $tag -t $target -m "$comments"
+	git checkout -f tizen 
+	git branch -D groupsub || true
+	popd
+
+	sleep 1
+done
+
+echo "Done"

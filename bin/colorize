@@ -1,0 +1,10 @@
+pathpat="(/[^/]*)+:[0-9]+"
+ccred=$(echo -e "\033[0;31m")
+ccyellow=$(echo -e "\033[0;33m")
+ccgreen=$(echo -e "\033[0;32m")
+ccend=$(echo -e "\033[0m")
+
+sed -E \
+	-e "/[Ee]rror[: ]/ s%$pathpat%$ccred&$ccend%g" \
+	-e "/[Ww]arning[: ]/ s%$pathpat%$ccyellow&$ccend%g" \
+	-e "/[Nn]ote[: ]/ s%$pathpat%$ccgreen&$ccend%g" 

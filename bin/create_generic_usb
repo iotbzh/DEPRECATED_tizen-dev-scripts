@@ -1,0 +1,57 @@
+#!/bin/bash
+
+function usage() {
+	echo "Usage: $0 <device> [snapshot=latest] [flavour=wayland] [arch=x86_64]"
+	exit 1
+}
+
+device=$1
+if [ ! -b "$device" ]; then
+	echo "Bad device $device"
+	usage
+fi
+
+snapshot=${2:-latest}
+
+flavour=${3:-wayland}
+
+arch=${4:-x86_64}
+
+case $arch in 
+	x86_64)
+		arch2=$arch
+		;;
+	ia32)
+		arch2=i586
+		;;
+	*)
+		echo "Unknown arch $arch: allowed architectures are: x86_64 or ia32"
+		exit 1
+		;;
+esac
+
+function get_repo_release() {
+    XMLSTARTLET=$(which xml || which xmlstarlet)
+
+    # use builddata (on tizen.org or tz.otcshare.org)
+    local rev
+    rev=$(curl --silent $1/builddata/build.xml | $XMLSTARTLET sel  -t -v "/build/id/text()" 2>/dev/null)
+    [[ -n "$rev" ]] && { echo $rev; return; }
+}
+
+
+baseurl=http://download.tizen.org/snapshots/tizen/generic/generic-${flavour}-${arch}
+
+snapshotid=$(get_repo_release ${baseurl}/${snapshot})
+if [ -z "$snapshotid" ]; then
+	echo "Unable to find snapshot id on ${baseurl}/${snapshot}"
+	exit 1
+fi
+
+echo "Retrieved snapshot ID: ${snapshotid}"
+
+url=${baseurl}/${snapshotid}/images/generic-${flavour}-mbr-${arch2}/${snapshotid}_generic-${flavour}-mbr-${arch2}-sda.raw.bz2
+
+sudo bmaptool copy $url $device
+
+

@@ -1,0 +1,36 @@
+#!/bin/bash
+
+API=https://api.tizen.org
+GITDIR=~/devel/tizen3/git
+
+sub=$1
+[[ -z "$sub" ]] && { echo "Invalid submission." >&2; exit 1; }
+
+project=${2:-Tizen:Common}
+
+subprj=home:prerelease:$project:$(echo $sub | tr '/' ':')
+
+subjson=$(osc -A $API meta prj $subprj | xml sel -t -v '/project/description' 2>/dev/null)
+
+pkgs=$(node << EOF
+var desc=$subjson;
+desc.projects.forEach(function(k) { process.stdout.write(k+'\n'); });
+EOF
+)
+
+echo "# submission $sub on $project"
+echo 
+
+for pkgpath in $pkgs; do 
+	pkg=$(basename $pkgpath)
+	meta=$(osc -A $API cat $subprj/$pkg/_service:gbs:_git-meta 2>/dev/null)
+	[ -z "$meta" ] && { echo "No meta for $pkgpath"; continue; }
+
+node <<EOF
+	var meta=$meta;
+	var pkgpath="$pkgpath";
+
+	process.stdout.write(pkgpath+" "+meta.commit.sha1+"\\n");
+EOF
+
+done

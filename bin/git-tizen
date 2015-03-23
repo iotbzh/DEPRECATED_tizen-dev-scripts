@@ -1,0 +1,129 @@
+#!/bin/bash
+
+TZHOST=review.tizen.org
+
+function error() { echo "Error: $@" >&2; exit 1; }
+function info() { echo "$@" >&2; }
+
+op=$1
+shift
+
+PROJECTS=
+function list_projects() {
+	if [[ -z "$PROJECTS" ]]; then
+		PROJECTS=$(mktemp)
+		info -n "Retrieving projects..."
+		trap "rm -fv $PROJECTS" STOP INT QUIT EXIT
+		ssh $TZHOST gerrit ls-projects 2>/dev/null >$PROJECTS
+		local cnt=$(wc -l $PROJECTS | awk '{print $1}')
+		[[ $cnt -lt 10 ]] && error "Unable to retrieve projects list"
+		info "$cnt projects"
+	fi
+	cat $PROJECTS
+}
+
+function tzsearch() {
+	(for pattern in "$@"; do
+		list_projects | egrep "$pattern"
+	done) | sort | uniq
+}
+
+function tzclone() {
+	for project in $(tzsearch "$@"); do
+		mkdir -p $(dirname $project)
+
+		fetchopts="-p origin +refs/heads/*:refs/remotes/origin/* +refs/changes/*:refs/changes/*"
+
+		if [[ -d $project ]]; then
+			info "updating existing project $project"
+			pushd $project &>/dev/null
+			git fetch
+			git pull
+			popd &>/dev/null
+		else
+			info "cloning $project"
+			git cclone review.tizen.org:$project $project
+		fi
+
+		pushd $project
+		git fetch $fetchopts
+		popd
+	done
+}
+
+function tzreset() {
+	for project in $(tzsearch "$@"); do
+		tzclone $project
+		pushd $project
+		git checkout -B tizen origin/tizen 
+		popd $project
+	done
+}
+
+function tzmanifest() {
+	projectpath=$(git remote -v | grep review.tizen.org | grep "(push)" | awk '{print $2}' | sed 's/review.tizen.org://')
+	[ -z "$projectpath" ] && return 1
+	sha1=$(git log -1 --pretty=format:%H)
+	#sha1=$(git rev-parse HEAD)
+
+	echo "   <project name=\"$projectpath\" revision=\"$sha1\"/>"
+}
+
+function usage() {
+	local myname=$(basename $0)
+	info "Usage:"
+	info "   $myname search|se <project pattern> [<project pattern> ... ]"
+	info "   $myname clone <project pattern> [<project pattern> ... ]"
+	info "   $myname reset <project pattern> [<project pattern> ... ]"
+	info "   $myname manifest"
+	exit 1
+}
+
+case $op in 
+	clone)
+		tzclone "$@"
+		;;
+	search|se)
+		tzsearch "$@"
+		;;
+	reset|re)
+		tzreset "$@"
+		;;
+	manifest|m)
+		tzmanifest "$@"
+		;;
+	help|-h|--help)
+		usage
+		;;
+	*)
+		usage
+		error "Unknown operation: $op"
+		;;
+esac
+
+exit 0
+
+project=$1
+shift
+[[ -z "$project" ]] && error "invalid project"
+
+op=$1
+shift
+
+host=${1:-review.tizen.org}
+
+# list projects
+	if [[ "$x" =~ $project ]]; then
+		case $op in
+			clone)
+				echo "====== cloning $x ======="
+				mkdir -p ./$(dirname $x)
+				git cclone $host:$x ./$x
+				;;
+			*)
+				echo $x;
+				;;
+		esac
+	fi
+done
+

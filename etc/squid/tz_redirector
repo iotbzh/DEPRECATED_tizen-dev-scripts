@@ -1,0 +1,30 @@
+#!/usr/bin/perl
+
+$|=1; # autoflush
+
+$REDIR="http://tzproxy";
+
+$DEBUG=0;
+
+if ($DEBUG) {
+	open LOG,">>/var/log/squid/tz_redirector.log";
+	LOG->autoflush(1);
+	print LOG "$$: new redirector starting\n";
+}
+
+while (<>) {
+    chomp;
+    @X = split;
+	$chan= $X[0];
+    $url = $X[1];
+
+    if ($url =~ /^http:\/\/(?:.+@)?download\.tz\.otcshare\.org(.*)$/) {
+		$path=$1;
+		$path=~s/\/\/+/\//g;
+        print "$chan $REDIR$path\n";
+		if ($DEBUG) { print LOG "$$: $url REDIRECT $REDIR$path\n"; }
+    } else {
+        print "$chan $url\n";
+		if ($DEBUG>1) { print LOG "$$: $url\n"; }
+    }
+}

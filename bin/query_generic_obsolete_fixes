@@ -1,0 +1,7 @@
+#!/bin/bash
+
+manifest=$1
+
+[[ ! -f $manifest ]] && { echo "Usage: $0 <manifest file>"; exit 1; }
+
+query_generic -l $(xml sel -t -v "/manifest/project/@name" Tizen/Generic/devel/manifest_fix.xml | xargs -n 1 basename)

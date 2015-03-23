@@ -1,0 +1,480 @@
+#!/bin/bash
+
+DIR=$(cd $(dirname $0); pwd)
+
+export VPN_CONFIG=$DIR/vpnadm.cnf
+export SSL_CONFIG=$DIR/openssl_genkey.cnf
+
+export CONFIG_DIR=$DIR/configs
+export KEY_DIR=$DIR/keys
+export CCD_DIR=$DIR/ovpn_jail/ccd
+
+[ ! -f $VPN_CONFIG ] && error "$VPN_CONFIG not found"
+. $VPN_CONFIG
+
+[ -z "$VPN_DOMAIN" ] && error "VPN_DOMAIN is not set in $VPN_CONFIG"
+
+# have to define this for commands that use openssl without specifiying cname
+export KEY_CNAME=${VPN_DOMAIN}-unknown
+
+[ ! -f $SSL_CONFIG ] && error "$SSL_CONFIG not found"
+
+mkdir -p $CONFIG_DIR || error "Unable to create dir $CONFIG_DIR"
+mkdir -p $KEY_DIR || error "Unable to create dir $KEY_DIR"
+
+function error () {
+	echo "ERROR: $@" >&2
+	exit 1
+}
+
+function usage () {
+	cat <<EOF >&2
+Usage: $(basename $0) <clean|server|client|revoke|conf> [name] [force]
+   - $(basename $0) clean: cleanup of all keys (clients and server)
+   - $(basename $0) server <cname>: generates CA certificate, server keys and DH file
+   - $(basename $0) client <cname> [passphrase]: creates a new client (keys and configuration file to be uploaded to client)
+   - $(basename $0) conf   <cname>: only creates specified client configuration file using existing key
+   - $(basename $0) revoke <cname>: revokes certificate with specified cname
+   - $(basename $0) remove <cname>: remove client specified by cname
+   - $(basename $0) bundle <cname>: create the bundle to be sent to user (gpg protected)
+   - $(basename $0) list: list declared clients
+EOF
+}
+
+function getip () {
+	dig +short $1
+}
+
+function genclientconf {
+	clt=$1
+
+	echo "Generating client configuration file in $CONFIG_DIR"
+
+	# generate client config on server side (ccd dir)
+	clthost=${clt}.${VPN_DOMAIN}
+	cltip=$(getip $clthost)
+	if [ -z "$cltip" ]; then
+		error "$clthost is not resolved. Please set in DNS zone"
+		exit 1
+	fi
+	clthost2=srv-${clt}.${VPN_DOMAIN} # server endpoint
+	cltip2=$(getip $clthost2) 
+	if [ -z "$cltip2" ]; then
+		error "$clthost2 is not resolved. Please set in DNS zone"
+		exit 1
+	fi
+	cat >$CCD_DIR/$KEY_CNAME << EOF
+ifconfig-push $cltip $cltip2
+EOF
+
+	cat >$CONFIG_DIR/$clthost.conf <<EOCONFIG
+# configuration file for vpn
+
+# generation_host=$(hostname -f)
+# generation_ts=$(date +%Y%m%d%H%M%S)
+
+# session name
+name=$clt
+
+password=$KEY_PASSWORD
+
+# openvpn server and port
+$(for srv in $VPN_SERVERS; do echo "server=$srv"; done)
+
+# do compression ?
+compress=${VPN_COMPRESS:-0}
+
+# do load balancing on servers ?
+loadbalance=${VPN_LOADBALANCE:-0}
+
+# Certification Authority
+ca=<<EOF
+$(cat $KEY_DIR/ca.crt)
+EOF
+
+# Session private key
+key=<<EOF
+$(cat $KEY_DIR/$clt.key)
+EOF
+
+# session certificate
+cert=<<EOF
+$(cat $KEY_DIR/$clt.crt)
+EOF
+EOCONFIG
+
+	# create client dir
+
+	cltrootdir=$(mktemp -dt ovpncfg.XXXXXX)
+	trap 'rm -rf $cltrootdir' EXIT INT QUIT STOP
+
+	echo "Generating detailed configuration files in $cltrootdir"
+
+	confdir=$clthost
+	tmpcltdir=$cltrootdir/$confdir
+	
+	mkdir -p $tmpcltdir
+
+	rundir=/var/run
+	logdir=/var/log
+	cfgdir=/etc/openvpn
+
+	# copy key files
+	cp $KEY_DIR/ca.crt $tmpcltdir/
+	cp $KEY_DIR/$clt.key $tmpcltdir/
+	cp $KEY_DIR/$clt.crt $tmpcltdir/
+	cp $KEY_DIR/ta.key $tmpcltdir/
+	echo secret@${clt}.$RANDOM >$tmpcltdir/management.pass
+
+	# generated with the same name as subconfig dif
+	cat >$tmpcltdir.conf << EOF
+##########################################
+# client-side OpenVPN 2.0 config file    #
+# for connecting to multi-client server. #
+##########################################
+# we're a client
+client
+
+# set session name
+setenv vpn_session $clt
+setenv vpn_cname $KEY_CNAME
+setenv vpn_domain $VPN_DOMAIN
+setenv vpn_host $clt.$VPN_DOMAIN
+setenv vpn_sessionenv $rundir/openvpn_$clthost.env
+
+# use tun device
+dev tun
+
+# use TCP or UDP
+proto udp
+#proto tcp-client
+
+# hostname/IP and port of the servers to try
+$(for srv in $VPN_SERVERS; do perl -e '($h,$p)=split /:/,shift @ARGV; if (!defined($p)) { $p=1194 } printf("remote %s %d\n",$h,$p);' $srv; done)
+
+remote-random
+
+# revolve server name indefinitely
+resolv-retry infinite
+
+# no local port binding
+nobind
+
+# user/group to run daemon
+# user nobody
+# group nobody
+
+# preserve some state across restarts
+persist-key
+persist-tun
+
+# avoid man-in-the-middle attack
+remote-cert-tls server
+ns-cert-type server
+
+# extra security: don't accept certificate if cname doesn't start with our domain
+tls-remote $VPN_DOMAIN
+
+# make session close on error
+# remap-usr1 SIGTERM
+
+# SSL/TLS parms
+ca $cfgdir/$confdir/ca.crt
+cert $cfgdir/$confdir/$clt.crt
+key $cfgdir/$confdir/$clt.key
+tls-auth $cfgdir/$confdir/ta.key 1
+
+cipher AES-256-CBC
+
+# Enable compression on the VPN link
+comp-lzo
+
+# accept server-pushed options
+pull
+
+# log file, status file, management port
+log-append $logdir/openvpn_$clthost.log
+status $rundir/openvpn_$clthost.status 5
+verb 2
+management localhost 7505 $cfgdir/$confdir/management.pass
+
+# set up/down scripts
+# script-security 2
+# up $cfgdir/$confdir/up.sh
+# down $cfgdir/$confdir/down.sh
+
+#up /etc/openvpn/update-resolv-conf
+#down /etc/openvpn/update-resolv-conf
+EOF
+
+	# windows version
+	cat >$tmpcltdir/$KEY_CNAME.ovpn << EOF
+##########################################
+# client-side OpenVPN 2.0 config file    #
+# for connecting to multi-client server. #
+#                                        #
+# this file is to be used under windows  #
+#                                        #
+# To use this conf file, swap it with    #
+# the .conf file in parent dir (.conf is #
+# for *nix clients and .ovpn is for Win) #
+##########################################
+# we're a client
+client
+
+# set session name
+setenv vpn_session $clt
+setenv vpn_cname $KEY_CNAME
+setenv vpn_domain $VPN_DOMAIN
+setenv vpn_host $clt.$VPN_DOMAIN
+setenv vpn_sessionenv openvpn_$clthost.env
+
+# use tun device
+dev tun
+
+# use TCP or UDP
+proto udp
+#proto tcp
+
+# hostname/IP and port of the servers to try
+$(for srv in $VPN_SERVERS; do perl -e '($h,$p)=split /:/,shift @ARGV; if (!defined($p)) { $p=1194 } printf("remote %s %d\n",$h,$p);' $srv; done)
+
+remote-random
+
+# revolve server name indefinitely
+resolv-retry infinite
+
+# no local port binding
+nobind
+
+# user/group to run daemon
+# user nobody
+# group nobody
+
+# preserve some state across restarts
+persist-key
+persist-tun
+
+# avoid man-in-the-middle attack
+remote-cert-tls server
+ns-cert-type server
+
+# extra security: don't accept certificate if cname doesn't start with our domain
+tls-remote $VPN_DOMAIN
+
+# make session close on error
+# remap-usr1 SIGTERM
+
+# SSL/TLS parms
+ca $confdir/ca.crt
+cert $confdir/$clt.crt
+key $confdir/$clt.key
+tls-auth $confdir/ta.key 1
+
+cipher AES-256-CBC
+
+# Enable compression on the VPN link
+comp-lzo
+
+# accept server-pushed options
+pull
+
+# log file, status file, management port
+# log-append $logdir/openvpn_$clthost.log
+status openvpn_$clthost.status 5
+verb 2
+management localhost 7505 $confdir/management.pass
+
+# set up/down scripts
+# script-security 2
+# up $confdir/up
+# down $confdir/down
+
+EOF
+
+	# change permissions
+	chmod -R og-rwx $cltrootdir
+
+	# create a tarball
+	echo "Creating tarball $CONFIG_DIR/$clthost.tgz"
+	tar zCcvf $cltrootdir $CONFIG_DIR/$clthost.tgz .
+
+	# remove temp dir
+	rm -rf $cltrootdir
+}
+
+cd $DIR
+
+cmd=$1
+shift
+
+case $cmd in 
+	clean)
+		echo -n "Are you sure [Y/N] ? "
+		read ans
+		[ "$ans" != "Y" ] && { echo "abort."; exit 0; }
+
+		echo "cleaning keys..."
+		rm -rf $KEY_DIR
+		mkdir $KEY_DIR || error "mkdir $KEY_DIR failed"
+
+		echo "cleaning client configs..."
+		rm -rf $CONFIG_DIR
+		mkdir $CONFIG_DIR || error "mkdir $CONFIG_DIR failed"
+
+		echo "cleaning ccd..."
+		rm -rf $CCD_DIR
+		mkdir $CCD_DIR || error "mkdir $CCD_DIR failed"
+
+		chmod go-rwx $KEY_DIR || error "chmod $KEY_DIR failed"
+		touch $KEY_DIR/index.txt || error "index init failed"
+		echo 01 >$KEY_DIR/serial || error "serial init failed"
+		;;
+	server)
+		srv=$1
+		[ -z "$srv" ] && error "Server name not given"
+
+		cakey=$KEY_DIR/ca.key
+		cacrt=$KEY_DIR/ca.crt
+		key=$KEY_DIR/server.key
+		csr=$KEY_DIR/server.csr
+		crt=$KEY_DIR/server.crt
+
+		[ "$2" == "force" ] && rm -f $key $csr $crt
+		[ -f $cakey ] && error "$cakey already exists"
+		[ -f $cacrt ] && error "$cacrt already exists"
+		[ -f $key ] && error "$key already exists"
+		[ -f $csr ] && error "$csr already exists"
+		[ -f $crt ] && error "$crt already exists"
+
+		export KEY_CNAME=${VPN_DOMAIN}-$srv
+		export KEY_CN=$KEY_CNAME
+		export KEY_NAME=$KEY_CNAME
+		export KEY_CHALLENGEPASS="${srv}pass"
+
+		# gen CA
+		openssl req -batch -days 3650 -nodes -new -x509 -keyout $cakey -out $cacrt -config $SSL_CONFIG || error "openssl failed"
+		chmod 0600 $cakey || error "chmod $cakey failed"
+
+		# gen server cert
+		openssl req -batch -days 3650 -nodes -new -keyout $key -out $csr -extensions server -config $SSL_CONFIG || error "openssl failed"
+		openssl ca -days 3650 -out $crt -in $csr -extensions server -batch -config $SSL_CONFIG || error "openssl failed"
+		chmod 0600 $key || error "chmod $key failed"
+
+		openssl dhparam -out $KEY_DIR/dh${KEY_SIZE}.pem $KEY_SIZE
+
+		openvpn --genkey --secret $KEY_DIR/ta.key 
+		;;
+	client)
+		clt=$1
+		[ -z "$clt" ] && error "Client name not given"
+		key=$KEY_DIR/$clt.key
+		csr=$KEY_DIR/$clt.csr
+		crt=$KEY_DIR/$clt.crt
+		[ "$2" == "force" ] && rm -f $key $csr $crt
+		[ -f $key ] && error "$key already exists"
+		[ -f $csr ] && error "$csr already exists"
+		[ -f $crt ] && error "$crt already exists"
+
+		# resolve client
+		if [ $clt != "generic" ]; then
+			host $clt.$VPN_DOMAIN >/dev/null 2>&1 
+			[ $? -ne 0 ] && error "Unable to resolve $clt.$VPN_DOMAIN"
+		fi
+
+		export KEY_CNAME=${VPN_DOMAIN}-$clt
+		export KEY_CN=$KEY_CNAME
+		export KEY_NAME=$KEY_CNAME
+		export KEY_CHALLENGEPASS="${clt}pass"
+		if [ -z "$2" -a $# -eq 2 ]; then 
+			export KEY_PASSWORD=
+		else
+			export KEY_PASSWORD=${clt}!$(printf %04x $RANDOM)@
+		fi
+
+		if [ -z "$KEY_PASSWORD" ]; then
+			echo "Encrypting without pass" >&2
+			openssl req -batch -days 3650 -nodes -new -keyout $key -out $csr -config $SSL_CONFIG || error "openssl failed"
+		else
+			echo "Encrypting with pass" >&2
+			openssl req -batch -days 3650 -passout env:KEY_PASSWORD -new -keyout $key -out $csr -config $SSL_CONFIG || error "openssl failed"
+		fi
+		openssl ca -days 3650 -out $crt -in $csr -batch -config $SSL_CONFIG || error "openssl failed"
+		chmod 0600 $key || error "chmod $key failed"
+
+		genclientconf $clt
+		;;
+	conf)
+		clt=$1
+		[ -z "$clt" ] && error "Client name not given"
+		genclientconf $clt
+		;;
+
+	revoke)
+		clt=$1
+		[ -z "$clt" ] && error "Client name not given"
+		crt=$KEY_DIR/$clt.crt
+		[ ! -f $crt ] && error "$crt doesn't exist"
+
+		openssl ca -revoke $crt -config $SSL_CONFIG 
+		rm -vf $KEY_DIR/$clt.*
+
+		openssl ca -gencrl -out $KEY_DIR/crl.pem -config $SSL_CONFIG
+		;;
+
+	remove)
+		clt=$1
+		[ -z "$clt" ] && error "Client name not given"
+		rm -vf $CONFIG_DIR/$clt.$VPN_DOMAIN.*
+		rm -vf $KEY_DIR/$clt.*
+		rm -vf $CCD_DIR/$VPN_DOMAIN-$clt
+		grep -v "/CN=${VPN_DOMAIN}-$clt/" $KEY_DIR/index.txt >$KEY_DIR/index.txt.new && mv $KEY_DIR/index.txt.new $KEY_DIR/index.txt 
+		;;
+	
+	list)
+		for x in $(ls $CONFIG_DIR/*.conf 2>/dev/null); do
+			clt=$(basename $x .$VPN_DOMAIN.conf)
+			err=
+			[ ! -f $CONFIG_DIR/$clt.$VPN_DOMAIN.tgz ] && err+=" miss_tarball"
+			[ ! -f $KEY_DIR/$clt.crt ] && err+=" miss_crt"
+			[ ! -f $KEY_DIR/$clt.csr ] && err+=" miss_csr"
+			[ ! -f $KEY_DIR/$clt.key ] && err+=" miss_key"
+			[ ! -f $CCD_DIR/${VPN_DOMAIN}-$clt ] && err+="miss_ccd"
+
+			ip=$(getip $clt.$VPN_DOMAIN)
+			[ -z "$ip" ] && err+="bad_ip"
+
+			echo -n $clt$'\t'$ip$'\t'
+			[ -z "$err" ] && echo "OK" || echo "FAIL: $err"
+
+		done
+		;;
+
+	bundle) 
+		clt=$1
+		[[ -z "$clt" ]] && error "Client name not given"
+		[[ ! -f $CONFIG_DIR/$clt.$VPN_DOMAIN.conf ]] && error "client $clt not declared"
+
+		base=$CONFIG_DIR/$clt.$VPN_DOMAIN
+
+		# crypt the tarball
+		gpg -c --batch --passphrase $GPG_PASSPHRASE $base.tgz
+
+		# create the password file
+		grep ^password= $base.conf | sed 's/^password=//' >$base.pass
+
+		# crypt the password file
+		gpg -c --batch --passphrase $GPG_PASSPHRASE $base.pass
+		rm $base.pass
+
+		echo "Bundle created:"
+		ls $CONFIG_DIR/$clt*.gpg
+		;;
+
+
+	*)
+		usage
+		exit 1
+		;;
+esac
+

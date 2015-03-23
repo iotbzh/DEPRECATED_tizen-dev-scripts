@@ -1,0 +1,23 @@
+# this file is used by gen_vpnconf to generate client configuration file
+
+# key generation variables
+export KEY_SIZE=2048
+export KEY_COUNTRY=FR
+export KEY_PROVINCE=NA
+export KEY_CITY=VANNES
+export KEY_ORG="XXXXXXXX"
+export KEY_COMPANY="XXXXXXXXXX"
+export KEY_OU="DRI"
+export KEY_CHALLENGEPASS="XxXxXxXxXxXxXxXx"
+export KEY_EMAIL="webmaster@vannes"
+
+export PKCS11_MODULE_PATH=changeme
+export PKCS11_PIN=1234
+
+export VPN_DOMAIN="vpn.vannes"
+export VPN_SERVERS="11.11.11.11:666"
+export VPN_COMPRESS=1
+export VPN_LOADBALANCE=0
+
+# to send confs to clients
+export GPG_PASSPHRASE="P@ssPhr@se"

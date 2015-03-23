@@ -1,0 +1,13 @@
+#!/bin/bash
+
+repo=$1
+rev=$2
+
+cat <<EOF
+<services>
+	<service name='gbs'>
+		<param name='revision'>$rev</param>
+		<param name='url'>ssh://review.tizen.org/$repo</param>
+    </service>
+</services>
+EOF

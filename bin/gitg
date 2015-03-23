@@ -1,0 +1,26 @@
+#!/bin/bash 
+
+searchpath="/:.:$HOME/devel/tizen3/git:$HOME/devel/common/git:"
+
+path=${1:-.}
+if [ -d $path ]; then
+	shift 
+fi
+
+if [ "$path" == "." ]; then
+	/usr/bin/gitg &
+	exit 0
+fi
+
+echo $searchpath | while read -d':' sp; do
+	fullpath="${sp}/${path}"
+	fullpath=${fullpath//\/\//\/}
+
+	if [[ -d $fullpath/.git ]]; then
+		echo "gitg wrapper: running gitg in $fullpath"
+		/usr/bin/gitg $fullpath &
+		exit 0
+	fi
+done 
+
+[[ $? -ne 1 ]] && echo "Unable to find project $path"

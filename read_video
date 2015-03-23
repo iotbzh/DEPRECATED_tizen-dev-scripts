@@ -1,0 +1,21 @@
+FILE=${1:-caminandes_1080p.mp4}
+
+export XDG_SESSION_ID=c1
+export WAYLAND_DISPLAY=wayland-0
+export ELM_ENGINE=wayland_egl
+export WRT_PROCESS_POOL_DISABLE=ON
+export ECORE_EVAS_ENGINE=wayland_egl
+export XDG_SEAT=seat0
+export XDG_RUNTIME_DIR=/run/user/5000
+
+#gst-launch-1.0 v4l2src ! video/x-raw, width=640, height=480 ! videoconvert ! waylandsink
+
+#gst-launch-1.0 -vv playbin uri=file://$FILE
+
+#gst-launch-1.0 -vv filesrc  location=$FILE ! qtdemux name=demux  \
+#	demux.audio_0 ! queue ! decodebin ! audioconvert ! audioresample ! autoaudiosink \
+#	demux.video_0 ! queue ! vaapidecode ! vaapisink
+
+gst-launch-1.0 -vv filesrc  location=$FILE ! qtdemux name=demux  \
+	demux.video_0 ! queue ! vaapidecode ! vaapisink
+

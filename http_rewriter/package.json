@@ -1,0 +1,19 @@
+{
+  "author": "kooltux <sdx@kooltux.org>",
+  "name": "http_rewriter",
+  "description": "HTTP(S) Redirection proxy",
+  "version": "0.1.0",
+  "repository": {
+    "url": ""
+  },
+  "devDependencies": {},
+  "optionalDependencies": {},
+  "engines": {
+    "node": "*"
+	},
+  "dependencies": {
+  	 "start-stop-daemon": "*",
+	 "underscore": "*",
+	 "log4js":"0.5.7"
+  }
+}

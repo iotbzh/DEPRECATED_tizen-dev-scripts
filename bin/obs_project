@@ -1,0 +1,22 @@
+#!/bin/bash
+
+cmd=$1
+shift
+
+case $cmd in
+	enable)
+		project=$1
+		osc api -X POST "/source/$project/?cmd=set_flag&flag=build&status=enable"
+		;;
+	
+	disable)
+		project=$1
+		osc api -X POST "/source/$project/?cmd=set_flag&flag=build&status=disable"
+		;;
+	*)
+		echo "Unknown command '$cmd'" >&2
+		echo "Usage: $0 <enable|disable> <project>"
+		exit 1
+		;;
+esac
+
