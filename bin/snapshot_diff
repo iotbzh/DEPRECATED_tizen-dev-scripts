@@ -1,0 +1,274 @@
+#!/bin/bash
+
+# This script computes the differences between 2 and more tizen profiles.
+# Run it with '-h' or '--help' to get usage guidelines
+#
+# Authors: 
+#	Stéphane Desneux <sdx@kooltux.org>
+#	José Bollo <jobol@nonadev.net>
+
+set -e
+
+# adjust base url for tizen snapshots if needed
+URL_BASE=http://download.tizen.org/snapshots/tizen
+
+GITHOME=~/devel/tizen3/git
+
+XMLSTARLET=$(which xml || which xmlstarlet)
+[[ -z "$XMLSTARLET" ]] && { echo "Please install package 'xmlstarlet' (or 'xml' on some distros)"; exit 1; }
+
+export LANG=C # for sorting
+
+function usage() {
+	cat << EOF >&2
+Usage: $(basename $0) [project1 [project2]]
+
+Project format: name[/snapshotid]
+Examples:
+   - common
+   - tv
+   - mobile
+   - wearable
+   - common/latest
+   - common/tizen-common_20150511.1
+EOF
+}
+
+# handle help
+[[ $1 =~ ^(-h|--help)$ ]] && { usage; exit 0; }
+
+# set default projects to analyse
+[[ $# == 0 ]] && set -- common/latest tv/latest
+[[ $# == 1 ]] && set -- $1 tv/latest
+
+###########################
+
+# log function
+function info() {
+	echo "$@" >&2
+}
+
+# parse an argument and returns a formatted string with <project name>/<snapshot id>
+function parse_argument() {
+	arg=$1
+	if [[ $arg =~ ^([[:alnum:]]+)(/([[:alnum:]_\.-]+))?$ ]]; then
+		project=${BASH_REMATCH[1]}
+		id=${BASH_REMATCH[3]:-latest}
+
+		# resolve id
+		id=$(get_release $project/$id)
+
+		echo $project/$id
+		return 0
+	fi
+	usage
+	return 1
+}
+
+# extracts snapshot id from build.xml file
+function get_release() {
+	local url_snapshot=$1
+
+	info -n "Retrieving snapshot id for $url_snapshot... "
+    local rev
+    rev=$(curl --silent $URL_BASE/$url_snapshot/build.xml | $XMLSTARLET sel  -t -v "/build/id/text()" 2>/dev/null)
+    [[ -z "$rev" ]] && { info "Invalid project at $URL_BASE/$url_snapshot"; return 1; }
+	
+	echo $rev
+	info "found $rev"
+}
+
+# extracts the list of repos from build.xml
+function get_repos() {
+	local url_snapshot=$1
+
+	info -n "Retrieving repositories list for $url_snapshot... "
+	local repos
+    repos=$(curl --silent $URL_BASE/$url_snapshot/build.xml | $XMLSTARLET sel  -t -v "/build/buildtargets/buildtarget/@name" 2>/dev/null | sed 's/\n/ /g')
+	[[ -z "$repos" ]] && { info "Project $URL_BASE/$url_snapshot has no repos"; return 1; }
+
+	echo $repos
+	info "found $(wc -w <<<$repos | awk '{print $1}') repos"
+}
+
+# merges all manifests in given snapshot and return a sorted list of <git path> <revision>
+function get_pkg_list() {
+	local url_snapshot=$1
+
+	local snapshotid=$(cut -f2 -d'/' <<<$url_snapshot)
+	local manifest_url
+
+	repolist=$(get_repos $url_snapshot)
+	
+	info -n "Retrieving packages list ..."
+	for repo in $repolist; do 
+		manifest_url=$url_snapshot/builddata/manifest/${snapshotid}_${repo}.xml
+		curl --silent $URL_BASE/$manifest_url | xml sel -t -m '//project' -v  'concat(@name," ",@revision)' -n | awk '{printf("%s %s\n",$1,substr($2,1,7));}'
+		info -n " $repo"
+	done | sort -u
+	info ""
+}
+
+########################
+
+function color {
+	for k in $*; do
+		case $k in
+			bold) tput bold 2>/dev/null;;
+			none) tput sgr0 2>/dev/null;;
+			*) tput setaf $k 2>/dev/null;;
+		esac
+	done
+}
+
+RED=$(color bold 1)
+GREEN=$(color bold 2)
+YELLOW=$(color bold 3)
+BLUE=$(color bold 4)
+COLOR_NONE=$(color none)
+
+function tzfind() {
+	paths=$(ls -d $GITHOME/$1/.git 2>/dev/null)
+	[[ -z "$paths" ]] && paths=$(ls -d $GITHOME/*/$1/.git 2>/dev/null)
+	[[ -z "$paths" ]] && paths=$(ls -d $GITHOME/*/*/$1/.git 2>/dev/null)
+	[[ -z "$paths" ]] && paths=$(ls -d $GITHOME/*/*/*/$1/.git 2>/dev/null)
+	[[ -z "$paths" ]] && paths=$(ls -d $GITHOME/*/*/*/*/$1/.git 2>/dev/null)
+	if [[ -z "$paths" ]]; then
+		echo "Git tree not found: $1" >&2
+		return 0
+	fi
+
+	if [[ $(echo $paths | wc -w) -gt 1 ]]; then
+		echo "Path is not unique: $paths" >&2
+		return 0
+	fi
+
+	gitdir=$(dirname $paths)
+	[[ -d "$gitdir" ]] && echo $gitdir
+}
+
+function git_analyze() {
+	local projects="$@"
+	local colorize=0
+	[[ -t 1 ]] && colorize=1 # test if stdout is a terminal
+
+	# print header
+	printf "%-60s" git_path
+	for x in $projects; do printf "%-10s " $x; done; echo
+
+	while read line; do
+		set -- $line
+		repo=$1; shift
+		ref_commit=$1; shift
+		printf "%-60s%-8s" $repo $ref_commit
+
+		if [[ "$ref_commit" == "-" ]]; then
+			for x in $@; do printf "  %-8s" $x; done; echo
+			continue
+		fi
+
+		localdir=$(tzfind $repo)
+		if [[ -z "$localdir" ]]; then
+			printf "%-60s" "$repo NOT_FOUND"
+			for x in $@; do printf "  %-8s" $x; done; echo
+			continue
+		fi
+
+		pushd $localdir &>/dev/null
+#		git fetch -p origin +refs/heads/*:refs/remotes/origin/* +refs/changes/*:refs/changes/* &>/dev/null
+
+			for rev; do
+				if [[ "$rev" == "-" ]]; then
+					col=${BLUE}
+					res="  "
+				elif [[ "$ref_commit" == "$rev" ]]; then
+					col=${GREEN}
+					res="S:" # "synced"
+				elif git merge-base --is-ancestor $ref_commit $rev; then
+					# ref_commit is ancestor of current commit => not synced
+					col=${RED}
+					res="N:" # "not synced", "newer"
+				else
+					col=${YELLOW}
+					res="F:" # "frozen"
+				fi
+
+				[[ $colorize == 1 ]] && echo -n $col
+				printf "%s%-8s" "$res" $rev
+				[[ $colorize == 1 ]] && echo -n ${COLOR_NONE}
+			done
+
+			echo 
+		popd &>/dev/null
+	done
+}
+			
+#######################
+
+tmpfile1=$(mktemp /tmp/$(basename $0).XXXXXX)
+tmpfile2=$(mktemp /tmp/$(basename $0).XXXXXX)
+tmpfile3=$(mktemp /tmp/$(basename $0).XXXXXX)
+tmpfile4=$(mktemp /tmp/$(basename $0).XXXXXX)
+trap "rm -f $tmpfile1 $tmpfile2 $tmpfile3 $tmpfile4" STOP INT QUIT EXIT
+
+e=3
+printf "%-60s" git_path
+
+make_git_analysis=0
+projects=""
+
+for arg in $@; do
+	case $arg in
+		-g|--git) 
+			make_git_analysis=1
+			continue
+			;;
+		*)
+			;;
+	esac
+
+	project=$(parse_argument $arg)
+	projects="$projects $project"
+
+	printf "%-10s " $project
+
+	get_pkg_list $project >$tmpfile2
+
+	# the join command can't handle more than 2 files.
+	# So we substitute spaces by '|' so that the sed will replace the first '|' by a space but not 
+	# the next ones: for the 'join' command, the line still has 2 fields: the git path and the concatenation of the previous git revisions
+	# we also replace empty fields by '#<pos>' with <pos> being the position of the next field: this
+	# is used in the awk call below to generate empty fields on output
+	if [ -s $tmpfile1 ]; then
+		sed 's/|/ /' $tmpfile1 |
+			join -a 1 -a 2 -o "0 1.2 2.2" -e "#$e" - $tmpfile2 |
+			tr ' ' '|' >$tmpfile3
+		cp $tmpfile3 $tmpfile1 # for next step
+		e="$((e + 1))"
+	else
+		tr ' ' '|' <$tmpfile2 >$tmpfile1
+	fi
+
+	# The final line stored in $tmpfile3 looks like (with 4 projects and only 2 with the given pkg):
+	# profile/common/meta|5761ff1|4c5da9e|#4|#5
+done
+
+printf "\n"
+
+# the first awk call replaces '#<pos>' with empty fields (depending on position): it creates new fields if needed
+# so we need a second call to 1) skip the lines which contain the same revisions and 2)format the final result 
+tr '|' ' ' <$tmpfile3 |
+awk 'function f(z){return z<=1 ? "-" : "- "f(z-1)} function max(a,b) {return a<b?b:a;} 
+  {for(j=i=2;i<=NF;i++) { if($i ~ /^#/) { n=substr($i,2); $i=f(n-j); j+=max(1,n-j) } else j++;}}1' |
+	awk '{ for(i=2;i<NF && $i == $(i+1);i++); if (i == NF) next; 
+		 printf("%-60s",$1); for(i=2;i<=NF;i++) printf "%-10s",$i; printf("\n"); }' >$tmpfile1
+
+if [[ $make_git_analysis == 1 ]]; then
+	cat $tmpfile1 | git_analyze $projects
+else 
+	cat $tmpfile1
+fi
+
+info "$(wc -l $tmpfile1|awk '{print $1}') differences"
+
+
