@@ -1,0 +1,21 @@
+#!/usr/bin/sh
+
+#check the list of host
+if [ $# -eq 0 ] ; then
+   LIST_HOST=$(grep -v '#' worker_hosts)
+else
+   LIST_HOST="$@"
+fi
+
+
+for h in ${LIST_HOST}; 
+do
+  echo ${h}
+  echo ________________________________________________
+  echo Copy service
+  scp worker_conf/obsworker root@"${h}":/etc/init.d/
+  echo Copy config
+  scp worker_conf/obs-server root@"${h}":/etc/sysconfig/
+  echo Restart service
+  ssh root@${h} /etc/init.d/obsworker restart 
+done
