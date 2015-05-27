@@ -12,7 +12,7 @@ set -e
 # adjust base url for tizen snapshots if needed
 URL_BASE=http://download.tizen.org/snapshots/tizen
 
-GITHOME=~/devel/tizen3/git
+GITHOME=${GITHOME:-~/devel/tizen3/git}
 
 XMLSTARLET=$(which xml || which xmlstarlet)
 [[ -z "$XMLSTARLET" ]] && { echo "Please install package 'xmlstarlet' (or 'xml' on some distros)"; exit 1; }
@@ -21,7 +21,9 @@ export LANG=C # for sorting
 
 function usage() {
 	cat << EOF >&2
-Usage: $(basename $0) [project1 [project2]]
+Usage: $(basename $0) [-g|--git] [project1 [project2]]
+
+-g options: also make a git analysis (adjust GITHOME variable in the script)
 
 Project format: name[/snapshotid]
 Examples:
@@ -125,6 +127,7 @@ RED=$(color bold 1)
 GREEN=$(color bold 2)
 YELLOW=$(color bold 3)
 BLUE=$(color bold 4)
+MAGENTA=$(color bold 5)
 COLOR_NONE=$(color none)
 
 function tzfind() {
@@ -152,10 +155,6 @@ function git_analyze() {
 	local colorize=0
 	[[ -t 1 ]] && colorize=1 # test if stdout is a terminal
 
-	# print header
-	printf "%-60s" git_path
-	for x in $projects; do printf "%-10s " $x; done; echo
-
 	while read line; do
 		set -- $line
 		repo=$1; shift
@@ -181,16 +180,29 @@ function git_analyze() {
 				if [[ "$rev" == "-" ]]; then
 					col=${BLUE}
 					res="  "
-				elif [[ "$ref_commit" == "$rev" ]]; then
+				elif [[ "$rev" == "$ref_commit" ]]; then
 					col=${GREEN}
 					res="S:" # "synced"
-				elif git merge-base --is-ancestor $ref_commit $rev; then
-					# ref_commit is ancestor of current commit => not synced
-					col=${RED}
-					res="N:" # "not synced", "newer"
+				elif anc=$(git merge-base $rev $ref_commit | cut -c1-7); then
+					case $anc in
+						$rev)
+							col=${YELLOW}
+							res="F:" # "frozen"
+							;;
+						$ref_commit)
+							# ref_commit is ancestor of current commit => not synced
+							col=${MAGENTA}
+							res="N:" # "not synced", "newer"
+							;;
+						*)
+							col=${RED}
+							res="D:" # "diverged"
+							;;
+					esac
+
 				else
-					col=${YELLOW}
-					res="F:" # "frozen"
+					col=${RED}
+					res="U:" # "unrelated"
 				fi
 
 				[[ $colorize == 1 ]] && echo -n $col
@@ -211,11 +223,15 @@ tmpfile3=$(mktemp /tmp/$(basename $0).XXXXXX)
 tmpfile4=$(mktemp /tmp/$(basename $0).XXXXXX)
 trap "rm -f $tmpfile1 $tmpfile2 $tmpfile3 $tmpfile4" STOP INT QUIT EXIT
 
-e=3
-printf "%-60s" git_path
 
 make_git_analysis=0
 projects=""
+
+e=3
+
+echo "# command line: $0 $@" >$tmpfile4
+echo >>$tmpfile4
+echo "# differences between projects:" >>$tmpfile4
 
 for arg in $@; do
 	case $arg in
@@ -229,8 +245,8 @@ for arg in $@; do
 
 	project=$(parse_argument $arg)
 	projects="$projects $project"
-
-	printf "%-10s " $project
+	
+	echo "# - $project" >>$tmpfile4
 
 	get_pkg_list $project >$tmpfile2
 
@@ -253,7 +269,22 @@ for arg in $@; do
 	# profile/common/meta|5761ff1|4c5da9e|#4|#5
 done
 
-printf "\n"
+cat $tmpfile4
+echo
+if [[ $make_git_analysis == 1 ]]; then
+cat <<EOF
+# Legend:
+# - S: synced
+# - N: newer (error)
+# - F: frozen (older)
+# - U: unrelated
+# - D: diverged
+
+EOF
+fi
+
+printf "#%-60s" git_path
+for x in $projects; do printf "%-10s" $(cut -f1 -d'/' <<<$x); done; echo
 
 # the first awk call replaces '#<pos>' with empty fields (depending on position): it creates new fields if needed
 # so we need a second call to 1) skip the lines which contain the same revisions and 2)format the final result 
