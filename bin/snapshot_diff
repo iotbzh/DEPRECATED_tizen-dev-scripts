@@ -53,14 +53,23 @@ function info() {
 # parse an argument and returns a formatted string with <project name>/<snapshot id>
 function parse_argument() {
 	arg=$1
-	if [[ $arg =~ ^([[:alnum:]]+)(/([[:alnum:]_\.-]+))?$ ]]; then
+	if [[ $arg =~ ^([[:alnum:]]+)(/([^/\t ]*)(/([^\t ]*))?)?$ ]]; then
 		project=${BASH_REMATCH[1]}
-		id=${BASH_REMATCH[3]:-latest}
+		id=${BASH_REMATCH[3]:-*}
+		repopattern=${BASH_REMATCH[5]:-*}
+
+		# id can be optional (empty)
+		case $id in
+			""|"*") id=latest ;;
+			*) ;;
+		esac
 
 		# resolve id
 		id=$(get_release $project/$id)
+		[[ -z "$id" ]] && return 1
 
-		echo $project/$id
+		echo $project/$id/$repopattern
+
 		return 0
 	fi
 	usage
@@ -69,6 +78,7 @@ function parse_argument() {
 
 # extracts snapshot id from build.xml file
 function get_release() {
+	# $1 == project/id
 	local url_snapshot=$1
 
 	info -n "Retrieving snapshot id for $url_snapshot... "
@@ -82,25 +92,34 @@ function get_release() {
 
 # extracts the list of repos from build.xml
 function get_repos() {
-	local url_snapshot=$1
+	# $1 == project/id/repo_pattern
+	local url_snapshot=$(cut -f1-2 -d'/' <<<$1)
+	local pattern=$(cut -f3 -d'/' <<<$1)
 
 	info -n "Retrieving repositories list for $url_snapshot... "
 	local repos
     repos=$(curl --silent $URL_BASE/$url_snapshot/build.xml | $XMLSTARLET sel  -t -v "/build/buildtargets/buildtarget/@name" 2>/dev/null | sed 's/\n/ /g')
 	[[ -z "$repos" ]] && { info "Project $URL_BASE/$url_snapshot has no repos"; return 1; }
 
-	echo $repos
-	info "found $(wc -w <<<$repos | awk '{print $1}') repos"
+	local frepos=""
+	for x in $repos; do
+		[[ -z "${x##$pattern}" ]] && frepos="$frepos $x" || info "Skipping repo $x"
+	done
+
+	echo $frepos
+
+	info "found $(wc -w <<<$frepos | awk '{print $1}') repos"
 }
 
 # merges all manifests in given snapshot and return a sorted list of <git path> <revision>
 function get_pkg_list() {
-	local url_snapshot=$1
+	# $1 == project/id/repo_pattern
+	local url_snapshot=$(cut -f1-2 -d'/' <<<$1)
 
 	local snapshotid=$(cut -f2 -d'/' <<<$url_snapshot)
 	local manifest_url
 
-	repolist=$(get_repos $url_snapshot)
+	repolist=$(get_repos $1)
 	
 	info -n "Retrieving packages list ..."
 	for repo in $repolist; do 
@@ -244,6 +263,7 @@ for arg in $@; do
 	esac
 
 	project=$(parse_argument $arg)
+
 	projects="$projects $project"
 	
 	echo "# - $project" >>$tmpfile4
