@@ -10,7 +10,8 @@
 set -e
 
 # adjust base url for tizen snapshots if needed
-URL_BASE=http://download.tizen.org/snapshots/tizen
+URL_BASE_DEFAULT=http://download.tizen.org/snapshots/tizen
+URL_BASE=$URL_BASE_DEFAULT
 
 GITHOME=${GITHOME:-~/devel/tizen3/git}
 
@@ -21,9 +22,11 @@ export LANG=C # for sorting
 
 function usage() {
 	cat << EOF >&2
-Usage: $(basename $0) [-g|--git] [project1 [project2]]
+Usage: $(basename $0) [-g|--git] [-u <baseurl>] [project1 [-u <baseurl>] [project2]]
 
--g options: also make a git analysis (adjust GITHOME variable in the script)
+-g option: also make a git analysis (adjust GITHOME variable in the script)
+-u option: allows to change the default base url for next projects
+           default is: $URL_BASE_DEFAULT
 
 Project format: name[/snapshotid]
 Examples:
@@ -53,7 +56,7 @@ function info() {
 # parse an argument and returns a formatted string with <project name>/<snapshot id>
 function parse_argument() {
 	arg=$1
-	if [[ $arg =~ ^([[:alnum:]]+)(/([^/\t ]*)(/([^\t ]*))?)?$ ]]; then
+	if [[ $arg =~ ^([[:alnum:].-]+)(/([^/\t ]*)(/([^\t ]*))?)?$ ]]; then
 		project=${BASH_REMATCH[1]}
 		id=${BASH_REMATCH[3]:-*}
 		repopattern=${BASH_REMATCH[5]:-*}
@@ -252,13 +255,21 @@ echo "# command line: $0 $@" >$tmpfile4
 echo >>$tmpfile4
 echo "# differences between projects:" >>$tmpfile4
 
-for arg in $@; do
-	case $arg in
+while [[ $# != 0 ]]; do
+	case $1 in
 		-g|--git) 
 			make_git_analysis=1
+			shift
+			continue
+			;;
+		-u|--url)
+			URL_BASE=${2:-$URL_BASE_DEFAULT}
+			shift 2
 			continue
 			;;
 		*)
+			arg=$1
+			shift
 			;;
 	esac
 
