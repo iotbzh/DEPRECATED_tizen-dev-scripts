@@ -172,21 +172,42 @@ function tzfind() {
 	[[ -d "$gitdir" ]] && echo $gitdir
 }
 
+function git_find_anc() {
+	# in current dir
+	local rev=$1
+	local ref_commit=$2
+
+	# check that both commits exist
+	git rev-list -n 1 $rev &>/dev/null && 
+	git rev-list -n 1 $ref_commit &>/dev/null && 
+	{ git merge-base $rev $ref_commit | cut -c1-7; return 0; }
+	
+	# try to fetch 
+	git fetch -p origin +refs/heads/*:refs/remotes/origin/* +refs/changes/*:refs/changes/* &>/dev/null
+
+	# retry 
+	git rev-list -n 1 $rev &>/dev/null && 
+	git rev-list -n 1 $ref_commit &>/dev/null && 
+	{ git merge-base $rev $ref_commit | cut -c1-7; return 0; }
+
+	echo "UNKNOWN"
+	return 1
+}
+
 function git_analyze() {
+	local group_submission_list=$1
+	shift
+
 	local projects="$@"
 	local colorize=0
 	[[ -t 1 ]] && colorize=1 # test if stdout is a terminal
 
+	local groupsubdelete=
 	while read line; do
 		set -- $line
 		repo=$1; shift
 		ref_commit=$1; shift
 		printf "%-60s%-8s" $repo $ref_commit
-
-		if [[ "$ref_commit" == "-" ]]; then
-			for x in $@; do printf "  %-8s" $x; done; echo
-			continue
-		fi
 
 		localdir=$(tzfind $repo)
 		if [[ -z "$localdir" ]]; then
@@ -198,14 +219,30 @@ function git_analyze() {
 		pushd $localdir &>/dev/null
 #		git fetch -p origin +refs/heads/*:refs/remotes/origin/* +refs/changes/*:refs/changes/* &>/dev/null
 
+			local groupsubrev=
+			local groupsubcomment=
+			local n=1 # skip first project, which is the reference
 			for rev; do
-				if [[ "$rev" == "-" ]]; then
+				n=$((n + 1))
+				project=$(awk "{print \$$n}" <<<$projects)
+
+				if [[ "$ref_commit" == "-" ]]; then
+					col=${BLUE}
+					res="P:" # private
+					if [[ -z "$groupsubrev" ]]; then
+						groupsubrev=$rev
+						groupsubcomment="# added from $project"
+					elif [[ "$rev" != "$groupsubrev" ]]; then
+						groupsubcomment="$groupsubcomment (or added $rev from $project)"
+					fi
+				elif [[ "$rev" == "-" ]]; then
 					col=${BLUE}
 					res="  "
+					groupsubdelete="$groupsubdelete $repo"
 				elif [[ "$rev" == "$ref_commit" ]]; then
 					col=${GREEN}
 					res="S:" # "synced"
-				elif anc=$(git merge-base $rev $ref_commit | cut -c1-7); then
+				elif anc=$(git_find_anc $rev $ref_commit); then
 					case $anc in
 						$rev)
 							col=${YELLOW}
@@ -215,6 +252,16 @@ function git_analyze() {
 							# ref_commit is ancestor of current commit => not synced
 							col=${MAGENTA}
 							res="N:" # "not synced", "newer"
+							if [[ -z "$groupsubrev" ]]; then
+								groupsubrev=$rev
+								groupsubcomment="# updated from $project"
+							elif [[ "$rev" != "$groupsubrev" ]]; then
+								groupsubcomment="$groupsubcomment (or updated $rev from $project)"
+							fi
+							;;
+						UNKNOWN)
+							col=${RED}
+							res="E:" # ERROR on git analysis
 							;;
 						*)
 							col=${RED}
@@ -233,8 +280,22 @@ function git_analyze() {
 			done
 
 			echo 
+
 		popd &>/dev/null
+
+		if [[ -n "$group_submission_list" && -n "$groupsubrev" ]]; then
+			printf "%-50s %-8s %s\n" $repo $groupsubrev "$groupsubcomment" >>$group_submission_list
+		fi
 	done
+
+	if [[ -n "$group_submission_list" && -n "$groupsubdelete" ]]; then
+		echo
+		echo "# the following packages may be deleted if not present in all other projects" >>$group_submission_list
+
+		for x in $groupsubdelete; do 
+			echo $x
+		done | sort -u | sed 's/^/# /g' >>$group_submission_list
+	fi
 }
 			
 #######################
@@ -247,6 +308,7 @@ trap "rm -f $tmpfile1 $tmpfile2 $tmpfile3 $tmpfile4" STOP INT QUIT EXIT
 
 
 make_git_analysis=0
+group_submission_list=""
 projects=""
 
 e=3
@@ -260,6 +322,12 @@ while [[ $# != 0 ]]; do
 		-g|--git) 
 			make_git_analysis=1
 			shift
+			continue
+			;;
+		-G|--groupsubmit) 
+			make_git_analysis=1
+			group_submission_list=$2
+			shift 2
 			continue
 			;;
 		-u|--url)
@@ -310,6 +378,8 @@ cat <<EOF
 # - F: frozen (older)
 # - U: unrelated
 # - D: diverged
+# - E: error in analysis (invalid commit ids)
+# - P: private (== not present in ref project)
 
 EOF
 fi
@@ -326,11 +396,11 @@ awk 'function f(z){return z<=1 ? "-" : "- "f(z-1)} function max(a,b) {return a<b
 		 printf("%-60s",$1); for(i=2;i<=NF;i++) printf "%-10s",$i; printf("\n"); }' >$tmpfile1
 
 if [[ $make_git_analysis == 1 ]]; then
-	cat $tmpfile1 | git_analyze $projects
+	[[ -n "$group_submission_list" ]] && rm -f $group_submission_list
+	cat $tmpfile1 | git_analyze "$group_submission_list" $projects
 else 
 	cat $tmpfile1
 fi
 
 info "$(wc -l $tmpfile1|awk '{print $1}') differences"
-
-
+[[ -f $group_submission_list ]] && echo "Group submission generated in $group_submission_list."
