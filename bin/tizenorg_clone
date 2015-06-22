@@ -1,11 +1,13 @@
 #!/bin/bash 
 
+PATH=~/bin:$PATH # for git cclone
+
 PARALLEL_JOBS=8
 
 function error() { echo "Error: $@" >&2; exit 1; }
 
 host=review.tizen.org
-patterns="sdk/target tools/ scm/ platform/kernel platform/framework/ platform/core/ platform/upstream/ apps/ samples/native/ samples/web/ profile/ kernel test/generic"
+patterns="sdk/target tools/ scm/ platform/kernel platform/adaptation platform/framework/ platform/core/ platform/upstream/ apps/ samples/native/ samples/web/ profile/ kernel test/generic contrib"
 
 DIR=$(pwd -P)
 
