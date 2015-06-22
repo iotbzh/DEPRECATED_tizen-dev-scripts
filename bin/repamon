@@ -1,0 +1,231 @@
+#!/bin/bash
+
+# this script monitors the repa queue for a given project/server
+# Author: Stéphane Desneux <sdx@kooltux.org>
+
+
+# default args
+PATTERN_DEF="*"
+PROJECT_DEF=Tizen:Common
+SERVER_DEF=https://api.tizen.org
+
+BLACKLIST_PKGS_RE="^.*_aggregate$"
+
+# global values
+PRERELEASE_PREFIX=home:prerelease
+
+function error() { echo "ERROR: $@" >&2; exit 1; }
+function info() { echo "$@" >&2; }
+function usage() {
+	echo "Usage: $(basename $0) [-h|--help] [-s|--server url] [-p|--project name] [-m|--match pattern] [-v|--verbose]" >&2
+	echo "   -h|--help: get this help" >&2
+	echo "   -s|--server: OBS server url. default: $SERVER_DEF" >&2
+	echo "   -p|--project: OBS project. default: $PROJECT_DEF" >&2
+	echo "   -m|--match: only monitor submissions that match the pattern. default: $PATTERN_DEF" >&2
+	echo "   -v|--verbose: raise verbosity" >&2
+	exit 1
+}
+
+[[ -t 1 ]] && COLORIZE=Y
+function color {
+	[[ -n "$COLORIZE" ]] && for k in $*; do
+		case $k in
+			bold) tput bold 2>/dev/null;;
+			none) tput sgr0 2>/dev/null;;
+			*) tput setaf $k 2>/dev/null;;
+		esac
+	done
+}
+
+GRAY=$(color bold 0)
+RED=$(color bold 1)
+GREEN=$(color bold 2)
+YELLOW=$(color bold 3)
+BLUE=$(color bold 4)
+MAGENTA=$(color bold 5)
+CYAN=$(color bold 6)
+COLOR_NONE=$(color none)
+
+# parse args
+TEMP=$(getopt -o vhs:p:m: --long verbose,help,server:,project:,match: -n $(basename $0) -- "$@")
+[[ $? != 0 ]] && { echo ; usage; }
+set -e
+
+eval set -- "$TEMP"
+
+PATTERN=$PATTERN_DEF
+PROJECT=$PROJECT_DEF
+SERVER=$SERVER_DEF
+VERBOSE=
+
+while true; do
+    case "$1" in
+        -s|--server) SERVER=$2; shift 2;;
+        -p|--project) PROJECT=$2; shift 2;;
+        -m|--match) PATTERN=$2; shift 2;;
+        -v|--verbose) VERBOSE=Y; shift 1;;
+		-h|--help) usage;;
+        --) shift; break;;
+        *) usage;;
+    esac
+done
+
+OSC=$(which osc)
+[[ -n "$OSC" ]] || error "Please install osc."
+OSC="$OSC -A $SERVER"
+
+XML=$(which xml)
+[[ -n "$XML" ]] || error "Please install xmlstarlet."
+
+NODE=$(which node)
+[[ -n "$NODE" ]] || error "Please install node.js."
+
+function list_submissions() {
+	# get the list of current submissions
+	for x in $($OSC ls /); do
+		if [[ "$x" =~ ^${PRERELEASE_PREFIX}:${PROJECT}:(.*) ]]; then
+			sub=${BASH_REMATCH[1]}
+			sub=${sub//://} 
+
+			[[ -z "${sub##*$PATTERN*}" ]] && echo $sub $x
+		fi
+	done
+}
+
+function analyze_submission() {
+	local sub=$1
+	local prj=$2
+
+	printf "%-30s " $sub
+
+	declare -a args
+	declare -a repos
+	local pkgerrmsg=
+	local pkgerrors=0
+	local pkgbuilding=0
+	local pkgpending=0
+	local pkgsucceeded=0
+	local pkgdisabled=0
+	
+	local tmpfile=$(mktemp /tmp/$(basename $0).XXXXXX)
+	trap "rm -f $tmpfile" STOP INT QUIT EXIT
+	exec 3>$tmpfile
+
+	# get list of submitted packages
+	local json=$($OSC meta prj $prj | $XML sel -t -v '/project/description' 2>/dev/null)
+	local pkgs=$(echo "var desc=$json; process.stdout.write(desc.projects.join('\n'));" | node)
+
+	$OSC prjresults --csv $prj | { 
+		while IFS=";" read -a args; do
+			set -- "${args[@]}"
+
+			# parse repos if first line (repos array is empty)
+			[[ ${#repos[@]} == 0 ]] && { 
+				shift # remove first cell ("package" header)
+				# copy array and skip
+				for x; do
+					IFS="/" read repo arch state <<<"$x"
+					repos[${#repos[@]}]=$repo
+				done
+				continue
+			}
+
+			local pkg=$1
+			shift
+			
+			[[ $pkg =~ $BLACKLIST_PKGS_RE ]] && continue
+
+			local i=0
+			local errmsg=
+			local errors=0
+			local building=0
+			local succeeded=0
+			local pending=0
+			local col
+			for s; do
+				case $s in 
+					scheduled|dispatching|blocked|locked)
+						pending=$((pending + 1))
+						;;
+					building)
+						building=$((building + 1))
+						;;
+					signing|finished|succeeded)
+						succeeded=$((succeeded + 1))
+						;;
+					disabled|excluded)
+						;;
+					broken|unresolvable|failed)
+						errors=$((errors + 1))
+						case $s in
+							broken) col=$MAGENTA;;
+							unresolvable) col=$CYAN;;
+							*) col=$RED;;
+						esac
+						errmsg="${errmsg}${col}${repos[$i]}${COLOR_NONE} "
+						;;
+					*)
+						;;
+				esac
+				i=$((i+1))
+			done
+
+			if [[ $pending == 0 && $building == 0 && $errors == 0 ]]; then
+				if [[ $succeeded > 0 ]]; then
+					pkgsucceeded=$((pkgsucceeded + 1))
+				else
+					pkgdisabled=$((pkgdisabled + 1))
+				fi
+			else
+				[[ $pending > 0 ]] && pkgpending=$((pkgpending + 1))
+				[[ $building > 0 ]] && pkgbuilding=$((pkgbuilding + 1))
+				[[ $errors > 0 ]] && pkgerrors=$((pkgerrors + 1 ))
+				[[ -n "$errmsg" ]] && pkgerrmsg="${pkgerrmsg}$pkg : $errmsg\n"
+			fi
+		done 
+
+		# export variables for parent shell
+		cat <<EOF >&3
+pkgerrmsg="$pkgerrmsg"
+pkgerrors=$pkgerrors
+pkgbuilding=$pkgbuilding
+pkgpending=$pkgpending
+pkgsucceeded=$pkgsucceeded
+pkgdisabled=$pkgdisabled
+EOF
+	}
+
+	. $tmpfile
+	rm -f $tmpfile
+
+	local s 
+	if [[ -n $VERBOSE ]]; then
+		[[ $pkgdisabled >0 ]] && s="${s}${GRAY}disabled:$pkgdisabled${COLOR_NONE} "
+		[[ $pkgpending >0 ]] && s="${s}${BLUE}pending:$pkgpending${COLOR_NONE} "
+		[[ $pkgbuilding >0 ]] && s="${s}${BLUE}building:$pkgbuilding${COLOR_NONE} "
+	else
+		[[ $pkgpending >0 || $pkgbuilding >0 ]] && s="${s}${BLUE}tobuild:$((pkgpending + pkgbuilding))${COLOR_NONE} "
+	fi
+	[[ $pkgerrors > 0 ]] && s="${s}${RED}errors:$pkgerrors${COLOR_NONE} "
+	[[ $pkgsucceeded >0 ]] && s="${s}${GREEN}succeeded:$pkgsucceeded${COLOR_NONE} "
+
+	
+	printf "%-40s" "$s"
+	if [[ -n "$VERBOSE" ]]; then
+		echo "   Packages:"
+		for x in $pkgs; do echo "      $(basename $x) ($x)"; done
+
+		if [[ -n "$pkgerrmsg" ]]; then
+			echo "   Errors:"
+			echo -e $pkgerrmsg | while read line; do echo "      $line"; done
+		fi
+	else
+		local pfx=;for x in $pkgs; do echo -n "${pfx}$(basename $x)"; pfx=","; done
+		echo
+	fi
+}
+
+list_submissions | while read sub prj; do
+	analyze_submission $sub $prj
+done
+
