@@ -20,13 +20,6 @@ XMLSTARLET=$(which xml || which xmlstarlet)
 
 export LANG=C # for sorting
 
-# temp files
-tmpfile1=$(mktemp /tmp/$(basename $0).XXXXXX)
-tmpfile2=$(mktemp /tmp/$(basename $0).XXXXXX)
-tmpfile3=$(mktemp /tmp/$(basename $0).XXXXXX)
-tmpfile4=$(mktemp /tmp/$(basename $0).XXXXXX)
-trap "rm -f $tmpfile1 $tmpfile2 $tmpfile3 $tmpfile4" STOP INT QUIT EXIT
-
 function usage() {
 	cat << EOF >&2
 Usage: $(basename $0) [-g|--git] [-u <baseurl>] [project1 [-u <baseurl>] [project2]]
@@ -63,7 +56,7 @@ function info() {
 # parse an argument and returns a formatted string with <project name>/<snapshot id>
 function parse_argument() {
 	arg=$1
-	if [[ $arg =~ ^([[:alnum:].-]+)(/([^/\t ]*)(/([^\t ]*))?)?$ ]]; then
+	if [[ $arg =~ ^([[:alnum:].-]+)(/([^/[:space:]]*)(/([^[:space:]]*))?)?$ ]]; then
 		project=${BASH_REMATCH[1]}
 		id=${BASH_REMATCH[3]:-*}
 		repopattern=${BASH_REMATCH[5]:-*}
@@ -82,6 +75,7 @@ function parse_argument() {
 
 		return 0
 	fi
+	info "Error: invalid argument $arg"
 	usage
 	return 1
 }
@@ -295,9 +289,6 @@ function git_analyze() {
 		fi
 	done
 
-	# remove duplicate lines if any
-	[[ -f "$group_submission_list" ]] && { uniq < $group_submission_list >$tmpfile2; mv $tmpfile2 $group_submission_list; }
-
 	if [[ -n "$group_submission_list" && -n "$groupsubdelete" ]]; then
 		echo
 		echo "# the following packages may be deleted if not present in all other projects" >>$group_submission_list
@@ -309,6 +300,13 @@ function git_analyze() {
 }
 			
 #######################
+
+tmpfile1=$(mktemp /tmp/$(basename $0).XXXXXX)
+tmpfile2=$(mktemp /tmp/$(basename $0).XXXXXX)
+tmpfile3=$(mktemp /tmp/$(basename $0).XXXXXX)
+tmpfile4=$(mktemp /tmp/$(basename $0).XXXXXX)
+trap "rm -f $tmpfile1 $tmpfile2 $tmpfile3 $tmpfile4" STOP INT QUIT EXIT
+
 
 make_git_analysis=0
 group_submission_list=""
