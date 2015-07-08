@@ -1,0 +1,16 @@
+qemu-system-arm \
+	-localtime \
+	-nographic \
+	-m 1024 \
+	-cpu cortex-a15 \
+	-machine type=virt,accel=kvm:tcg \
+	-kernel tizen-3.0.2015.Q2-common_20150630.1_common-wayland-2parts-armv7l-vmlinuz-3.14.28+ltsi-27.3-common-arm-default \
+	-append 'root=/dev/vda rw rootnowait mem=1024M console=ttyAMA0,38400n8 init=/usr/lib/systemd/systemd rootfstype=ext4' \
+	-device virtio-net-device,netdev=user0 \
+	-device virtio-blk-device,drive=disk \
+	-netdev user,id=user0 \
+	-device virtio-blk-device,drive=disk1 \
+	-device virtio-net-device,vlan=0,id=net0,mac=52:54:00:09:a4:37 \
+	-drive if=none,id=disk,index=0,file=./TZBOOT.img \
+	-drive if=none,id=disk1,index=1,file=./tizen-common.img \
+	-net user,hostfwd=tcp::2200-:22,vlan=0
