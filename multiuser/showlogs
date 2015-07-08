@@ -1,0 +1,17 @@
+#!/bin/bash
+
+cd $(dirname $0)
+
+for project in $(<upstream.list); do
+
+	shortname=${project//\//_}
+	shortname=${shortname/platform_/p_}
+	shortname=${shortname/framework_/f_}
+	shortname=${shortname/core_/c_}
+	shortname=${shortname/upstream_/u_}
+	shortname=${shortname/apps/a_}
+	shortname=${shortname/samples/s_}
+
+	grep packaging/ logs/$shortname.log
+done
+

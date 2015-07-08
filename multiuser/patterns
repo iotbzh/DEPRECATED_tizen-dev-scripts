@@ -1,0 +1,15 @@
+\s5000[^0-9]
+/app/
+"app"
+'app'
+chown\s
+%attr\(.*app
+setuid\s*\(
+seteuid\s*\(
+sqlite3_open\s*\(
+sqlite3\s
+db_util_open\s*\(
+dbspace
+opt/usr
+opt/home
+etc/usr

@@ -1,0 +1,35 @@
+#!/bin/bash
+
+cd $(dirname $0)
+
+for x in \
+	account \
+	ace \
+	alarmmgr \
+	app_info \
+	appsvc \
+	cert_svc_vcore \
+	mida \
+	notification \
+	pkgmgr_cert \
+	pkgmgr_parser \
+	privacy \
+	privacylist \
+	privilege_control_all_apps_id \
+	privilege_control_all_avs_id \
+	privilege_control_app_gids \
+	rua \
+	syspopup \
+	wrt \
+	; do
+
+	dbname="\.${x}\.db"
+
+	echo "=========================================== $x.db ================================="
+
+	for dir in apps platform profile/ivi profile/mobile; do
+		grep -sr -- $dbname $dir | cut -f1 -d':' | sort | uniq
+	done
+done
+
+

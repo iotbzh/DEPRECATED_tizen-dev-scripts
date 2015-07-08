@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cd $(dirname $0)
+
+ssh review.tizen.org gerrit ls-projects -d | tail +2 >projects.list
+
+for repo in $(<repo.lst); do 
+	echo $x
+
+	grp=$(grep  $repo projects.list | sed 's/^.*Domain: //g' | cut -f1 -d';'| sort|uniq|tr '\n' ' ')
+	grp2=$(grep -h -E "Group\s*:" $repo/packaging/*.spec 2>/dev/null | awk '{FS=":[ \t]*"}{print $2}' | sort|uniq | tr '\n' ' ')
+
+	echo -n "$repo;$grp;$grp2"
+
+done

@@ -1,0 +1,97 @@
+#!/bin/bash
+
+PARALLEL_JOBS=8
+
+function parallel_jobs {
+	local max_number=$((0 + ${1:-0}))
+	while true; do
+		jobs &>/dev/null
+		if [[ $(jobs -p | wc -l) -lt $max_number ]]; then
+			break
+		fi
+		sleep 0.3
+	done
+}
+
+
+truncate -s 0 result.log
+truncate -s 0 matrix.csv
+
+patterns=$(cat ./patterns)
+
+echo -n "Project;Matches" >matrix.csv
+for x in $patterns; do 
+	echo -n ";$x" >>matrix.csv
+done
+echo -n ";Log File;Bug Title;Bug ID" >>matrix.csv
+echo >>matrix.csv
+
+LOGDIR=logs
+
+mkdir -p $LOGDIR
+
+function check_project() {
+	project=$1
+
+	shortname=${project//\//_}
+	shortname=${shortname/platform_/p_}
+	shortname=${shortname/framework_/f_}
+	shortname=${shortname/core_/c_}
+	shortname=${shortname/upstream_/u_}
+	shortname=${shortname/apps_/a_}
+	shortname=${shortname/samples_/s_}
+
+	rm -f $LOGDIR/${shortname}*
+
+	projlog=$LOGDIR/${shortname}.log
+	truncate -s0 $projlog
+
+	matches=""
+	# big grep first
+	if grep --exclude-dir=.git -sr -E -f ./patterns $project >/dev/null 2>&1; then
+		pnum=0
+		for pattern in $patterns; do
+			pnum=$(( pnum + 1 ))
+			patlog=$LOGDIR/${shortname}_${pnum}.log
+			grep --exclude-dir=.git -sr -E -n "$pattern" $project >$patlog
+			if [[ $? -eq 0 ]]; then
+				matches="$matches;X"
+				cat $patlog >> $projlog
+			else
+				matches="$matches;"
+			fi
+			rm $patlog
+		done
+	fi
+
+	if [[ -s $projlog ]]; then
+		cat - $projlog >>result.log <<EOF
+----------------------------------- $project -----------------------------------
+EOF
+	else
+		rm $projlog
+	fi
+
+	if [[ -z "$matches" ]]; then
+		echo "$project : -"
+	else
+		cnt=$(echo -n $matches | sed 's/;//g' | wc -c)
+		title="Package ${project} is not compliant with multi-user architecture"
+		echo "${project};${cnt}${matches};${projlog};\"$title\"" >>matrix.csv
+		echo "$project : $cnt"
+	fi
+}
+
+# kill all pending greps
+killall grep
+
+# get projects to check
+for x in $(<repo.lst); do 
+	parallel_jobs $PARALLEL_JOBS
+	check_project $x &
+done
+
+parallel_jobs 1
+echo "Finished"
+
+

@@ -1,0 +1,46 @@
+#!/bin/bash
+
+SNAPSHOT=http://download.tizen.org/snapshots/tizen/common/latest
+REPOS="x86_64-wayland x86_64-x11"
+
+PARALLEL_JOBS=8
+
+function parallel_jobs {
+	local max_number=$((0 + ${1:-0}))
+	while true; do
+		jobs &>/dev/null
+		if [[ $(jobs -p | wc -l) -lt $max_number ]]; then
+			break
+		fi
+		sleep 0.3
+	done
+}
+
+function check_project() {
+	project=$1
+	pattern=$2
+	grep --exclude-dir=.git -sr -E -n "$pattern" $project 
+}
+
+function get_projects() {
+	snapshotid=$(curl --silent $SNAPSHOT/build.xml | xml sel -t -v '//build/id/text()')
+
+	echo "Snapshot ID: $snapshotid" >&2
+
+	for r in $REPOS; do
+		curl --silent $SNAPSHOT/builddata/manifest/${snapshotid}_${r}.xml | xml sel -t -v '//project/@name'
+	done | sort -u
+}
+
+
+cd $(dirname $0)
+
+for x in $(get_projects); do 
+	parallel_jobs $PARALLEL_JOBS
+	check_project $x $1 &
+done
+
+parallel_jobs 1
+echo "Finished" >&2
+
+
